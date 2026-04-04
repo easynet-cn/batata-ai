@@ -6,6 +6,9 @@ members = [
     "crates/batata-ai-mcp",
     "crates/batata-ai-prompt",
     "crates/batata-ai-local",
+    "crates/batata-ai-storage",
+    "crates/batata-ai-router",
+    "crates/batata-ai-object-store",
 ]
 
 [workspace.package]
@@ -21,6 +24,9 @@ batata-ai-provider = { path = "crates/batata-ai-provider" }
 batata-ai-mcp = { path = "crates/batata-ai-mcp" }
 batata-ai-prompt = { path = "crates/batata-ai-prompt" }
 batata-ai-local = { path = "crates/batata-ai-local" }
+batata-ai-storage = { path = "crates/batata-ai-storage" }
+batata-ai-router = { path = "crates/batata-ai-router" }
+batata-ai-object-store = { path = "crates/batata-ai-object-store" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -85,6 +91,8 @@ batata-ai-provider.workspace = true
 batata-ai-mcp.workspace = true
 batata-ai-prompt.workspace = true
 batata-ai-local.workspace = true
+batata-ai-storage.workspace = true
+batata-ai-router.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

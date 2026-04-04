@@ -1,0 +1,17 @@
+[package]
+name = "batata-ai-router"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Routing engine for batata-ai: policy-based provider selection with fallback"
+
+[dependencies]
+batata-ai-core.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+tracing.workspace = true
+uuid.workspace = true

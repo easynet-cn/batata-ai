@@ -1,0 +1,31 @@
+[package]
+name = "batata-ai-object-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Object storage backends for batata-ai: local, S3/MinIO, Alibaba Cloud OSS"
+
+[features]
+default = ["local"]
+local = []
+s3 = ["dep:rust-s3"]
+oss = ["dep:reqwest", "dep:hmac", "dep:sha2", "dep:base64", "dep:urlencoding"]
+
+[dependencies]
+batata-ai-core.workspace = true
+async-trait.workspace = true
+tokio = { workspace = true, features = ["fs"] }
+tracing.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+
+# S3 / MinIO
+rust-s3 = { version = "0.35", optional = true, default-features = false, features = ["tokio-rustls-tls"] }
+
+# OSS (manual signing)
+reqwest = { workspace = true, optional = true }
+hmac = { version = "0.12", optional = true }
+sha2 = { version = "0.10", optional = true }
+base64 = { version = "0.22", optional = true }
+urlencoding = { version = "2", optional = true }

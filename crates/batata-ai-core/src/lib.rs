@@ -1,6 +1,10 @@
 pub mod config;
+pub mod domain;
 pub mod error;
 pub mod message;
 pub mod multimodal;
+pub mod object_store;
 pub mod provider;
+pub mod repository;
+pub mod routing;
 pub mod skill;

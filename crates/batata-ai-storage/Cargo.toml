@@ -1,0 +1,37 @@
+[package]
+name = "batata-ai-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Persistent storage for batata-ai: sea-orm based repository implementations"
+
+[dependencies]
+batata-ai-core.workspace = true
+sea-orm = { version = "1", features = [
+    "sqlx-sqlite",
+    "sqlx-mysql",
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
+    "with-chrono",
+    "with-json",
+] }
+sea-orm-migration = { version = "1", features = [
+    "sqlx-sqlite",
+    "sqlx-mysql",
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "with-chrono",
+    "with-json",
+] }
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }

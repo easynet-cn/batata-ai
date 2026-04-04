@@ -28,6 +28,12 @@ pub enum BatataError {
 
     #[error("serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+
+    #[error("storage error: {0}")]
+    Storage(String),
+
+    #[error("not found: {0}")]
+    NotFound(String),
 }
 
 pub type Result<T> = std::result::Result<T, BatataError>;
