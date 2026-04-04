@@ -1,0 +1,27 @@
+[package]
+name = "batata-ai-provider"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Provider implementations for batata-ai: OpenAI, Anthropic, Ollama, Local"
+
+[features]
+default = ["openai", "ollama", "openrouter"]
+openai = ["dep:rig-core"]
+ollama = ["dep:rig-core"]
+anthropic = ["dep:rig-core"]
+openrouter = ["dep:rig-core"]
+all = ["openai", "ollama", "anthropic", "openrouter"]
+
+[dependencies]
+batata-ai-core.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+futures.workspace = true
+tracing.workspace = true
+reqwest.workspace = true
+rig-core = { workspace = true, optional = true }

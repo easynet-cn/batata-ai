@@ -1,0 +1,21 @@
+[package]
+name = "batata-ai-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "MCP (Model Context Protocol) integration for batata-ai"
+
+[dependencies]
+batata-ai-core.workspace = true
+batata-ai-local.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+rmcp.workspace = true
+schemars.workspace = true
+axum.workspace = true
+tokio-util.workspace = true

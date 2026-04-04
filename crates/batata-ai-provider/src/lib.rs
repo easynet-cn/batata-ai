@@ -1,0 +1,11 @@
+#[cfg(feature = "openai")]
+pub mod openai;
+
+#[cfg(feature = "ollama")]
+pub mod ollama;
+
+#[cfg(feature = "anthropic")]
+pub mod anthropic;
+
+#[cfg(feature = "openrouter")]
+pub mod openrouter;

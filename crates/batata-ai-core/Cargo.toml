@@ -1,0 +1,19 @@
+[package]
+name = "batata-ai-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core abstractions for batata-ai: Provider, Skill, Message, Config"
+
+[dependencies]
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+futures.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+dirs = "6"

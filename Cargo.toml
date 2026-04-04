@@ -1,0 +1,114 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/batata-ai-core",
+    "crates/batata-ai-provider",
+    "crates/batata-ai-mcp",
+    "crates/batata-ai-prompt",
+    "crates/batata-ai-local",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/easynet-cn/batata-ai"
+
+[workspace.dependencies]
+# Internal crates
+batata-ai-core = { path = "crates/batata-ai-core" }
+batata-ai-provider = { path = "crates/batata-ai-provider" }
+batata-ai-mcp = { path = "crates/batata-ai-mcp" }
+batata-ai-prompt = { path = "crates/batata-ai-prompt" }
+batata-ai-local = { path = "crates/batata-ai-local" }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# AI frameworks
+rig-core = "0.34"
+
+# MCP
+rmcp = { version = "1", features = ["client", "server", "macros", "transport-streamable-http-server"] }
+
+# Local inference (candle)
+candle-core = "0.10"
+candle-nn = "0.10"
+candle-transformers = "0.10"
+
+# HuggingFace Hub
+hf-hub = "0.4"
+
+# Tokenizer
+tokenizers = "0.22"
+
+# Stream utilities
+tokio-stream = "0.1"
+
+# HTTP
+reqwest = { version = "0.12", features = ["json"] }
+axum = "0.8"
+tokio-util = "0.7"
+
+# Schema
+schemars = "1"
+
+# Utils
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[package]
+name = "batata-ai"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "A Rust-based AI platform with local inference, multi-provider support, and MCP integration"
+
+[dependencies]
+batata-ai-core.workspace = true
+batata-ai-provider.workspace = true
+batata-ai-mcp.workspace = true
+batata-ai-prompt.workspace = true
+batata-ai-local.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+anyhow.workspace = true
+tracing-subscriber.workspace = true
+futures.workspace = true
+
+[[example]]
+name = "local_chat"
+
+[[example]]
+name = "local_stream"
+
+[[example]]
+name = "mcp_server"
+
+[[example]]
+name = "whisper_transcribe"
+
+[[example]]
+name = "clip_embed"
+
+[[example]]
+name = "download_model"
+
+[[example]]
+name = "mcp_http_server"
