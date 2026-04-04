@@ -55,6 +55,7 @@ impl ObjectStore for LocalFileStore {
         Ok(StoredObject {
             id: uuid::Uuid::new_v4().to_string(),
             bucket_id: self.store_config_id.clone(),
+            tenant_id: String::new(),
             key: key.to_string(),
             original_name: None,
             content_type: content_type.to_string(),

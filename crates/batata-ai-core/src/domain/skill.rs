@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillDefinition {
     pub id: String,
+    pub tenant_id: Option<String>,
     pub name: String,
     pub description: String,
     pub parameters_schema: serde_json::Value,

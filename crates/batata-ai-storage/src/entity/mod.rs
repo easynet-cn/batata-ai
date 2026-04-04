@@ -1,3 +1,6 @@
+pub mod api_key;
+pub mod conversation;
+pub mod conversation_message;
 pub mod model;
 pub mod model_cost;
 pub mod model_provider;
@@ -11,3 +14,4 @@ pub mod routing_policy;
 pub mod skill;
 pub mod skill_version;
 pub mod stored_object;
+pub mod tenant;

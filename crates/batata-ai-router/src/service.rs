@@ -117,6 +117,7 @@ impl RouterService {
             let log = match &result {
                 Ok(response) => RequestLog {
                     id: uuid::Uuid::new_v4().to_string(),
+                    tenant_id: String::new(),
                     provider_id: String::new(), // filled from response.model context
                     provider_name: String::new(),
                     model_identifier: response.model.clone(),
@@ -133,6 +134,7 @@ impl RouterService {
                 },
                 Err(e) => RequestLog {
                     id: uuid::Uuid::new_v4().to_string(),
+                    tenant_id: String::new(),
                     provider_id: String::new(),
                     provider_name: String::new(),
                     model_identifier: model_name.to_string(),

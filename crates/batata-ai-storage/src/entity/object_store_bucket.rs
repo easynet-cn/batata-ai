@@ -6,6 +6,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub config_id: String,
+    pub tenant_id: Option<String>,
     pub name: String,
     pub bucket: String,
     pub root_path: Option<String>,

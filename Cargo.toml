@@ -9,6 +9,7 @@ members = [
     "crates/batata-ai-storage",
     "crates/batata-ai-router",
     "crates/batata-ai-object-store",
+    "crates/batata-ai-api",
 ]
 
 [workspace.package]
@@ -27,6 +28,7 @@ batata-ai-local = { path = "crates/batata-ai-local" }
 batata-ai-storage = { path = "crates/batata-ai-storage" }
 batata-ai-router = { path = "crates/batata-ai-router" }
 batata-ai-object-store = { path = "crates/batata-ai-object-store" }
+batata-ai-api = { path = "crates/batata-ai-api" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }

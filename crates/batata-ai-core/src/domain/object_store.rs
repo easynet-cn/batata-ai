@@ -109,6 +109,7 @@ pub struct ObjectStoreConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObjectStoreBucket {
     pub id: String,
+    pub tenant_id: Option<String>,
     pub config_id: String,
     pub name: String,
     pub bucket: String,
@@ -131,6 +132,7 @@ pub struct ObjectStoreBucket {
 pub struct StoredObject {
     pub id: String,
     pub bucket_id: String,
+    pub tenant_id: String,
     pub key: String,
     pub original_name: Option<String>,
     pub content_type: String,

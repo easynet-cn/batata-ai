@@ -6,6 +6,54 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // tenants
+        manager
+            .create_table(
+                Table::create()
+                    .table(Tenants::Table)
+                    .if_not_exists()
+                    .col(string(Tenants::Id).primary_key())
+                    .col(string(Tenants::Name).not_null())
+                    .col(string(Tenants::Slug).unique_key().not_null())
+                    .col(json_null(Tenants::Config))
+                    .col(boolean(Tenants::Enabled).default(true).not_null())
+                    .col(timestamp(Tenants::CreatedAt).not_null())
+                    .col(timestamp(Tenants::UpdatedAt).not_null())
+                    .col(timestamp_null(Tenants::DeletedAt))
+                    .to_owned(),
+            )
+            .await?;
+
+        // api_keys
+        manager
+            .create_table(
+                Table::create()
+                    .table(ApiKeys::Table)
+                    .if_not_exists()
+                    .col(string(ApiKeys::Id).primary_key())
+                    .col(string(ApiKeys::TenantId).not_null())
+                    .col(string(ApiKeys::Name).not_null())
+                    .col(string(ApiKeys::KeyHash).unique_key().not_null())
+                    .col(string(ApiKeys::KeyPrefix).not_null())
+                    .col(json(ApiKeys::Scopes).not_null())
+                    .col(integer_null(ApiKeys::RateLimit))
+                    .col(timestamp_null(ApiKeys::ExpiresAt))
+                    .col(boolean(ApiKeys::Enabled).default(true).not_null())
+                    .col(timestamp_null(ApiKeys::LastUsedAt))
+                    .col(timestamp(ApiKeys::CreatedAt).not_null())
+                    .col(timestamp(ApiKeys::UpdatedAt).not_null())
+                    .col(timestamp_null(ApiKeys::DeletedAt))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_api_keys_tenant")
+                            .from(ApiKeys::Table, ApiKeys::TenantId)
+                            .to(Tenants::Table, Tenants::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
         // providers
         manager
             .create_table(
@@ -98,6 +146,7 @@ impl MigrationTrait for Migration {
                     .table(Prompts::Table)
                     .if_not_exists()
                     .col(string(Prompts::Id).primary_key())
+                    .col(string_null(Prompts::TenantId))
                     .col(string(Prompts::Name).unique_key().not_null())
                     .col(text(Prompts::Description).not_null())
                     .col(text(Prompts::Template).not_null())
@@ -118,6 +167,7 @@ impl MigrationTrait for Migration {
                     .table(Skills::Table)
                     .if_not_exists()
                     .col(string(Skills::Id).primary_key())
+                    .col(string_null(Skills::TenantId))
                     .col(string(Skills::Name).unique_key().not_null())
                     .col(text(Skills::Description).not_null())
                     .col(json(Skills::ParametersSchema).not_null())
@@ -215,6 +265,7 @@ impl MigrationTrait for Migration {
                     .table(RoutingPolicies::Table)
                     .if_not_exists()
                     .col(string(RoutingPolicies::Id).primary_key())
+                    .col(string_null(RoutingPolicies::TenantId))
                     .col(string(RoutingPolicies::Name).unique_key().not_null())
                     .col(string(RoutingPolicies::PolicyType).not_null())
                     .col(json(RoutingPolicies::Config).not_null())
@@ -278,6 +329,7 @@ impl MigrationTrait for Migration {
                     .table(RequestLogs::Table)
                     .if_not_exists()
                     .col(string(RequestLogs::Id).primary_key())
+                    .col(string(RequestLogs::TenantId).not_null())
                     .col(string(RequestLogs::ProviderId).not_null())
                     .col(string(RequestLogs::ProviderName).not_null())
                     .col(string(RequestLogs::ModelIdentifier).not_null())
@@ -315,7 +367,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // object_store_configs (凭证层)
+        // object_store_configs
         manager
             .create_table(
                 Table::create()
@@ -337,7 +389,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // object_store_buckets (桶层)
+        // object_store_buckets
         manager
             .create_table(
                 Table::create()
@@ -345,6 +397,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(string(ObjectStoreBuckets::Id).primary_key())
                     .col(string(ObjectStoreBuckets::ConfigId).not_null())
+                    .col(string_null(ObjectStoreBuckets::TenantId))
                     .col(string(ObjectStoreBuckets::Name).not_null())
                     .col(string(ObjectStoreBuckets::Bucket).not_null())
                     .col(string_null(ObjectStoreBuckets::RootPath))
@@ -387,6 +440,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(string(StoredObjects::Id).primary_key())
                     .col(string(StoredObjects::BucketId).not_null())
+                    .col(string(StoredObjects::TenantId).not_null())
                     .col(string(StoredObjects::Key).unique_key().not_null())
                     .col(string_null(StoredObjects::OriginalName))
                     .col(string(StoredObjects::ContentType).not_null())
@@ -406,10 +460,72 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // conversations
+        manager
+            .create_table(
+                Table::create()
+                    .table(Conversations::Table)
+                    .if_not_exists()
+                    .col(string(Conversations::Id).primary_key())
+                    .col(string(Conversations::TenantId).not_null())
+                    .col(string_null(Conversations::Title))
+                    .col(string_null(Conversations::Model))
+                    .col(text_null(Conversations::SystemPrompt))
+                    .col(json_null(Conversations::Metadata))
+                    .col(timestamp(Conversations::CreatedAt).not_null())
+                    .col(timestamp(Conversations::UpdatedAt).not_null())
+                    .col(timestamp_null(Conversations::DeletedAt))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_conversations_tenant")
+                            .from(Conversations::Table, Conversations::TenantId)
+                            .to(Tenants::Table, Tenants::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        // conversation_messages
+        manager
+            .create_table(
+                Table::create()
+                    .table(ConversationMessages::Table)
+                    .if_not_exists()
+                    .col(string(ConversationMessages::Id).primary_key())
+                    .col(string(ConversationMessages::ConversationId).not_null())
+                    .col(string(ConversationMessages::TenantId).not_null())
+                    .col(string(ConversationMessages::Role).not_null())
+                    .col(text(ConversationMessages::Content).not_null())
+                    .col(string_null(ConversationMessages::Model))
+                    .col(json_null(ConversationMessages::Usage))
+                    .col(big_integer_null(ConversationMessages::LatencyMs))
+                    .col(json_null(ConversationMessages::Metadata))
+                    .col(timestamp(ConversationMessages::CreatedAt).not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_conversation_messages_conversation")
+                            .from(
+                                ConversationMessages::Table,
+                                ConversationMessages::ConversationId,
+                            )
+                            .to(Conversations::Table, Conversations::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(ConversationMessages::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(Conversations::Table).to_owned())
+            .await?;
         manager
             .drop_table(Table::drop().table(StoredObjects::Table).to_owned())
             .await?;
@@ -449,8 +565,45 @@ impl MigrationTrait for Migration {
         manager
             .drop_table(Table::drop().table(Providers::Table).to_owned())
             .await?;
+        manager
+            .drop_table(Table::drop().table(ApiKeys::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(Tenants::Table).to_owned())
+            .await?;
         Ok(())
     }
+}
+
+#[derive(DeriveIden)]
+enum Tenants {
+    Table,
+    Id,
+    Name,
+    Slug,
+    Config,
+    Enabled,
+    CreatedAt,
+    UpdatedAt,
+    DeletedAt,
+}
+
+#[derive(DeriveIden)]
+enum ApiKeys {
+    Table,
+    Id,
+    TenantId,
+    Name,
+    KeyHash,
+    KeyPrefix,
+    Scopes,
+    RateLimit,
+    ExpiresAt,
+    Enabled,
+    LastUsedAt,
+    CreatedAt,
+    UpdatedAt,
+    DeletedAt,
 }
 
 #[derive(DeriveIden)]
@@ -500,6 +653,7 @@ enum ModelProviders {
 enum Prompts {
     Table,
     Id,
+    TenantId,
     Name,
     Description,
     Template,
@@ -515,6 +669,7 @@ enum Prompts {
 enum Skills {
     Table,
     Id,
+    TenantId,
     Name,
     Description,
     ParametersSchema,
@@ -559,6 +714,7 @@ enum SkillVersions {
 enum RoutingPolicies {
     Table,
     Id,
+    TenantId,
     Name,
     PolicyType,
     Config,
@@ -587,6 +743,7 @@ enum ModelCosts {
 enum RequestLogs {
     Table,
     Id,
+    TenantId,
     ProviderId,
     ProviderName,
     ModelIdentifier,
@@ -624,6 +781,7 @@ enum ObjectStoreBuckets {
     Table,
     Id,
     ConfigId,
+    TenantId,
     Name,
     Bucket,
     RootPath,
@@ -642,6 +800,7 @@ enum StoredObjects {
     Table,
     Id,
     BucketId,
+    TenantId,
     Key,
     OriginalName,
     ContentType,
@@ -650,4 +809,33 @@ enum StoredObjects {
     Metadata,
     CreatedAt,
     DeletedAt,
+}
+
+#[derive(DeriveIden)]
+enum Conversations {
+    Table,
+    Id,
+    TenantId,
+    Title,
+    Model,
+    SystemPrompt,
+    Metadata,
+    CreatedAt,
+    UpdatedAt,
+    DeletedAt,
+}
+
+#[derive(DeriveIden)]
+enum ConversationMessages {
+    Table,
+    Id,
+    ConversationId,
+    TenantId,
+    Role,
+    Content,
+    Model,
+    Usage,
+    LatencyMs,
+    Metadata,
+    CreatedAt,
 }

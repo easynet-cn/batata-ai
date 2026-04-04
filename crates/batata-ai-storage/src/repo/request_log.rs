@@ -27,6 +27,7 @@ impl RequestLogRepository for SeaOrmRequestLogRepository {
     async fn create(&self, log: &RequestLog) -> Result<RequestLog> {
         let active = request_log::ActiveModel {
             id: Set(log.id.clone()),
+            tenant_id: Set(log.tenant_id.clone()),
             provider_id: Set(log.provider_id.clone()),
             provider_name: Set(log.provider_name.clone()),
             model_identifier: Set(log.model_identifier.clone()),
@@ -58,11 +59,13 @@ impl RequestLogRepository for SeaOrmRequestLogRepository {
 
     async fn find_by_time_range(
         &self,
+        tenant_id: &str,
         from: NaiveDateTime,
         to: NaiveDateTime,
         limit: u64,
     ) -> Result<Vec<RequestLog>> {
         request_log::Entity::find()
+            .filter(request_log::Column::TenantId.eq(tenant_id))
             .filter(request_log::Column::CreatedAt.gte(from))
             .filter(request_log::Column::CreatedAt.lte(to))
             .order_by_desc(request_log::Column::CreatedAt)
@@ -75,10 +78,12 @@ impl RequestLogRepository for SeaOrmRequestLogRepository {
 
     async fn find_by_provider(
         &self,
+        tenant_id: &str,
         provider_id: &str,
         limit: u64,
     ) -> Result<Vec<RequestLog>> {
         request_log::Entity::find()
+            .filter(request_log::Column::TenantId.eq(tenant_id))
             .filter(request_log::Column::ProviderId.eq(provider_id))
             .order_by_desc(request_log::Column::CreatedAt)
             .limit(limit)

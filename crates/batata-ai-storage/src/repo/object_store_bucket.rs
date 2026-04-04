@@ -45,6 +45,7 @@ impl Repository<ObjectStoreBucket> for SeaOrmObjectStoreBucketRepository {
         let active = object_store_bucket::ActiveModel {
             id: Set(entity.id.clone()),
             config_id: Set(entity.config_id.clone()),
+            tenant_id: Set(entity.tenant_id.clone()),
             name: Set(entity.name.clone()),
             bucket: Set(entity.bucket.clone()),
             root_path: Set(entity.root_path.clone()),
@@ -68,6 +69,7 @@ impl Repository<ObjectStoreBucket> for SeaOrmObjectStoreBucketRepository {
         let active = object_store_bucket::ActiveModel {
             id: Set(entity.id.clone()),
             config_id: Set(entity.config_id.clone()),
+            tenant_id: Set(entity.tenant_id.clone()),
             name: Set(entity.name.clone()),
             bucket: Set(entity.bucket.clone()),
             root_path: Set(entity.root_path.clone()),
@@ -140,6 +142,20 @@ impl ObjectStoreBucketRepository for SeaOrmObjectStoreBucketRepository {
             .one(&self.db)
             .await
             .map(|opt| opt.map(Into::into))
+            .map_err(map_db_err)
+    }
+
+    async fn find_by_tenant(&self, tenant_id: &str) -> Result<Vec<ObjectStoreBucket>> {
+        object_store_bucket::Entity::find()
+            .filter(
+                Condition::any()
+                    .add(object_store_bucket::Column::TenantId.is_null())
+                    .add(object_store_bucket::Column::TenantId.eq(tenant_id)),
+            )
+            .filter(object_store_bucket::Column::DeletedAt.is_null())
+            .all(&self.db)
+            .await
+            .map(|v| v.into_iter().map(Into::into).collect())
             .map_err(map_db_err)
     }
 }

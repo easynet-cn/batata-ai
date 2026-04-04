@@ -8,10 +8,11 @@ use sea_orm_migration::MigratorTrait;
 use tracing;
 
 pub use repo::{
+    SeaOrmApiKeyRepository, SeaOrmConversationMessageRepository, SeaOrmConversationRepository,
     SeaOrmModelCostRepository, SeaOrmModelRepository, SeaOrmObjectStoreBucketRepository,
     SeaOrmObjectStoreConfigRepository, SeaOrmPromptRepository, SeaOrmProviderRepository,
     SeaOrmRequestLogRepository, SeaOrmRoutingPolicyRepository, SeaOrmSkillRepository,
-    SeaOrmStoredObjectRepository,
+    SeaOrmStoredObjectRepository, SeaOrmTenantRepository,
 };
 
 /// Connect to database and run pending migrations.

@@ -44,6 +44,7 @@ impl Repository<PromptDefinition> for SeaOrmPromptRepository {
     async fn create(&self, entity: &PromptDefinition) -> Result<PromptDefinition> {
         let active = prompt::ActiveModel {
             id: Set(entity.id.clone()),
+            tenant_id: Set(entity.tenant_id.clone()),
             name: Set(entity.name.clone()),
             description: Set(entity.description.clone()),
             template: Set(entity.template.clone()),
@@ -64,6 +65,7 @@ impl Repository<PromptDefinition> for SeaOrmPromptRepository {
     async fn update(&self, entity: &PromptDefinition) -> Result<PromptDefinition> {
         let active = prompt::ActiveModel {
             id: Set(entity.id.clone()),
+            tenant_id: Set(entity.tenant_id.clone()),
             name: Set(entity.name.clone()),
             description: Set(entity.description.clone()),
             template: Set(entity.template.clone()),
@@ -116,6 +118,20 @@ impl PromptRepository for SeaOrmPromptRepository {
             .map_err(map_db_err)
     }
 
+    async fn find_by_tenant(&self, tenant_id: &str) -> Result<Vec<PromptDefinition>> {
+        prompt::Entity::find()
+            .filter(
+                Condition::any()
+                    .add(prompt::Column::TenantId.is_null())
+                    .add(prompt::Column::TenantId.eq(tenant_id)),
+            )
+            .filter(prompt::Column::DeletedAt.is_null())
+            .all(&self.db)
+            .await
+            .map(|v| v.into_iter().map(Into::into).collect())
+            .map_err(map_db_err)
+    }
+
     async fn update_with_version(
         &self,
         entity: &PromptDefinition,
@@ -130,7 +146,7 @@ impl PromptRepository for SeaOrmPromptRepository {
             .map_err(map_db_err)?
             .ok_or_else(|| BatataError::NotFound(format!("prompt {}", entity.id)))?;
 
-        // 2. Snapshot current → prompt_versions
+        // 2. Snapshot current -> prompt_versions
         let version_id = uuid::Uuid::new_v4().to_string();
         let snapshot = prompt_version::ActiveModel {
             id: Set(version_id),
@@ -152,6 +168,7 @@ impl PromptRepository for SeaOrmPromptRepository {
         let new_version = current.version + 1;
         let active = prompt::ActiveModel {
             id: Set(entity.id.clone()),
+            tenant_id: Set(entity.tenant_id.clone()),
             name: Set(entity.name.clone()),
             description: Set(entity.description.clone()),
             template: Set(entity.template.clone()),
@@ -240,6 +257,7 @@ impl PromptRepository for SeaOrmPromptRepository {
         let new_version = current.version + 1;
         let active = prompt::ActiveModel {
             id: Set(prompt_id.to_string()),
+            tenant_id: Set(current.tenant_id),
             name: Set(current.name),
             description: Set(snapshot.description),
             template: Set(snapshot.template),

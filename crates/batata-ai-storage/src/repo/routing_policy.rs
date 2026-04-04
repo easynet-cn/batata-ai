@@ -44,6 +44,7 @@ impl Repository<RoutingPolicyDefinition> for SeaOrmRoutingPolicyRepository {
     async fn create(&self, entity: &RoutingPolicyDefinition) -> Result<RoutingPolicyDefinition> {
         let active = routing_policy::ActiveModel {
             id: Set(entity.id.clone()),
+            tenant_id: Set(entity.tenant_id.clone()),
             name: Set(entity.name.clone()),
             policy_type: Set(entity.policy_type.clone()),
             config: Set(entity.config.clone()),
@@ -63,6 +64,7 @@ impl Repository<RoutingPolicyDefinition> for SeaOrmRoutingPolicyRepository {
     async fn update(&self, entity: &RoutingPolicyDefinition) -> Result<RoutingPolicyDefinition> {
         let active = routing_policy::ActiveModel {
             id: Set(entity.id.clone()),
+            tenant_id: Set(entity.tenant_id.clone()),
             name: Set(entity.name.clone()),
             policy_type: Set(entity.policy_type.clone()),
             config: Set(entity.config.clone()),
@@ -109,6 +111,20 @@ impl RoutingPolicyRepository for SeaOrmRoutingPolicyRepository {
             .filter(routing_policy::Column::Enabled.eq(true))
             .filter(routing_policy::Column::DeletedAt.is_null())
             .order_by_asc(routing_policy::Column::Priority)
+            .all(&self.db)
+            .await
+            .map(|v| v.into_iter().map(Into::into).collect())
+            .map_err(map_db_err)
+    }
+
+    async fn find_by_tenant(&self, tenant_id: &str) -> Result<Vec<RoutingPolicyDefinition>> {
+        routing_policy::Entity::find()
+            .filter(
+                Condition::any()
+                    .add(routing_policy::Column::TenantId.is_null())
+                    .add(routing_policy::Column::TenantId.eq(tenant_id)),
+            )
+            .filter(routing_policy::Column::DeletedAt.is_null())
             .all(&self.db)
             .await
             .map(|v| v.into_iter().map(Into::into).collect())

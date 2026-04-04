@@ -1,8 +1,8 @@
 use batata_ai_core::domain::{
-    BucketAccessPolicy, ModelCost, ModelDefinition, ModelProvider, ModelType, ObjectStoreBackend,
-    ObjectStoreBucket, ObjectStoreConfig, PromptDefinition, PromptVersion, ProviderDefinition,
-    RequestLog, RequestStatus, RoutingPolicyDefinition, SkillDefinition, SkillVersion,
-    StoredObject,
+    ApiKey, BucketAccessPolicy, Conversation, ConversationMessage, ModelCost, ModelDefinition,
+    ModelProvider, ModelType, ObjectStoreBackend, ObjectStoreBucket, ObjectStoreConfig,
+    PromptDefinition, PromptVersion, ProviderDefinition, RequestLog, RequestStatus,
+    RoutingPolicyDefinition, SkillDefinition, SkillVersion, StoredObject, Tenant,
 };
 
 use crate::entity;
@@ -76,6 +76,7 @@ impl From<entity::prompt::Model> for PromptDefinition {
     fn from(m: entity::prompt::Model) -> Self {
         Self {
             id: m.id,
+            tenant_id: m.tenant_id,
             name: m.name,
             description: m.description,
             template: m.template,
@@ -97,6 +98,7 @@ impl From<entity::skill::Model> for SkillDefinition {
     fn from(m: entity::skill::Model) -> Self {
         Self {
             id: m.id,
+            tenant_id: m.tenant_id,
             name: m.name,
             description: m.description,
             parameters_schema: m.parameters_schema,
@@ -159,6 +161,7 @@ impl From<entity::routing_policy::Model> for RoutingPolicyDefinition {
     fn from(m: entity::routing_policy::Model) -> Self {
         Self {
             id: m.id,
+            tenant_id: m.tenant_id,
             name: m.name,
             policy_type: m.policy_type,
             config: m.config,
@@ -192,10 +195,6 @@ impl From<entity::model_cost::Model> for ModelCost {
 }
 
 // ---------------------------------------------------------------------------
-// RequestLog
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // ObjectStoreConfig
 // ---------------------------------------------------------------------------
 
@@ -226,6 +225,7 @@ impl From<entity::object_store_bucket::Model> for ObjectStoreBucket {
     fn from(m: entity::object_store_bucket::Model) -> Self {
         Self {
             id: m.id,
+            tenant_id: m.tenant_id,
             config_id: m.config_id,
             name: m.name,
             bucket: m.bucket,
@@ -251,6 +251,7 @@ impl From<entity::stored_object::Model> for StoredObject {
         Self {
             id: m.id,
             bucket_id: m.bucket_id,
+            tenant_id: m.tenant_id,
             key: m.key,
             original_name: m.original_name,
             content_type: m.content_type,
@@ -271,6 +272,7 @@ impl From<entity::request_log::Model> for RequestLog {
     fn from(m: entity::request_log::Model) -> Self {
         Self {
             id: m.id,
+            tenant_id: m.tenant_id,
             provider_id: m.provider_id,
             provider_name: m.provider_name,
             model_identifier: m.model_identifier,
@@ -282,6 +284,90 @@ impl From<entity::request_log::Model> for RequestLog {
             total_tokens: m.total_tokens.map(|v| v as u32),
             estimated_cost: m.estimated_cost,
             error_message: m.error_message,
+            metadata: m.metadata,
+            created_at: m.created_at,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tenant
+// ---------------------------------------------------------------------------
+
+impl From<entity::tenant::Model> for Tenant {
+    fn from(m: entity::tenant::Model) -> Self {
+        Self {
+            id: m.id,
+            name: m.name,
+            slug: m.slug,
+            config: m.config,
+            enabled: m.enabled,
+            created_at: m.created_at,
+            updated_at: m.updated_at,
+            deleted_at: m.deleted_at,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ApiKey
+// ---------------------------------------------------------------------------
+
+impl From<entity::api_key::Model> for ApiKey {
+    fn from(m: entity::api_key::Model) -> Self {
+        Self {
+            id: m.id,
+            tenant_id: m.tenant_id,
+            name: m.name,
+            key_hash: m.key_hash,
+            key_prefix: m.key_prefix,
+            scopes: m.scopes,
+            rate_limit: m.rate_limit,
+            expires_at: m.expires_at,
+            enabled: m.enabled,
+            last_used_at: m.last_used_at,
+            created_at: m.created_at,
+            updated_at: m.updated_at,
+            deleted_at: m.deleted_at,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Conversation
+// ---------------------------------------------------------------------------
+
+impl From<entity::conversation::Model> for Conversation {
+    fn from(m: entity::conversation::Model) -> Self {
+        Self {
+            id: m.id,
+            tenant_id: m.tenant_id,
+            title: m.title,
+            model: m.model,
+            system_prompt: m.system_prompt,
+            metadata: m.metadata,
+            created_at: m.created_at,
+            updated_at: m.updated_at,
+            deleted_at: m.deleted_at,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ConversationMessage
+// ---------------------------------------------------------------------------
+
+impl From<entity::conversation_message::Model> for ConversationMessage {
+    fn from(m: entity::conversation_message::Model) -> Self {
+        Self {
+            id: m.id,
+            conversation_id: m.conversation_id,
+            tenant_id: m.tenant_id,
+            role: m.role,
+            content: m.content,
+            model: m.model,
+            usage: m.usage,
+            latency_ms: m.latency_ms,
             metadata: m.metadata,
             created_at: m.created_at,
         }

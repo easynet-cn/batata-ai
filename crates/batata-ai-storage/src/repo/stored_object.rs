@@ -27,6 +27,7 @@ impl StoredObjectRepository for SeaOrmStoredObjectRepository {
         let active = stored_object::ActiveModel {
             id: Set(obj.id.clone()),
             bucket_id: Set(obj.bucket_id.clone()),
+            tenant_id: Set(obj.tenant_id.clone()),
             key: Set(obj.key.clone()),
             original_name: Set(obj.original_name.clone()),
             content_type: Set(obj.content_type.clone()),

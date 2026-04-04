@@ -5,6 +5,7 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
+    pub tenant_id: Option<String>,
     #[sea_orm(unique)]
     pub name: String,
     #[sea_orm(column_type = "Text")]

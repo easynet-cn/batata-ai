@@ -44,6 +44,7 @@ impl Repository<SkillDefinition> for SeaOrmSkillRepository {
     async fn create(&self, entity: &SkillDefinition) -> Result<SkillDefinition> {
         let active = skill::ActiveModel {
             id: Set(entity.id.clone()),
+            tenant_id: Set(entity.tenant_id.clone()),
             name: Set(entity.name.clone()),
             description: Set(entity.description.clone()),
             parameters_schema: Set(entity.parameters_schema.clone()),
@@ -65,6 +66,7 @@ impl Repository<SkillDefinition> for SeaOrmSkillRepository {
     async fn update(&self, entity: &SkillDefinition) -> Result<SkillDefinition> {
         let active = skill::ActiveModel {
             id: Set(entity.id.clone()),
+            tenant_id: Set(entity.tenant_id.clone()),
             name: Set(entity.name.clone()),
             description: Set(entity.description.clone()),
             parameters_schema: Set(entity.parameters_schema.clone()),
@@ -118,6 +120,20 @@ impl SkillRepository for SeaOrmSkillRepository {
             .map_err(map_db_err)
     }
 
+    async fn find_by_tenant(&self, tenant_id: &str) -> Result<Vec<SkillDefinition>> {
+        skill::Entity::find()
+            .filter(
+                Condition::any()
+                    .add(skill::Column::TenantId.is_null())
+                    .add(skill::Column::TenantId.eq(tenant_id)),
+            )
+            .filter(skill::Column::DeletedAt.is_null())
+            .all(&self.db)
+            .await
+            .map(|v| v.into_iter().map(Into::into).collect())
+            .map_err(map_db_err)
+    }
+
     async fn update_with_version(
         &self,
         entity: &SkillDefinition,
@@ -132,7 +148,7 @@ impl SkillRepository for SeaOrmSkillRepository {
             .map_err(map_db_err)?
             .ok_or_else(|| BatataError::NotFound(format!("skill {}", entity.id)))?;
 
-        // 2. Snapshot current → skill_versions
+        // 2. Snapshot current -> skill_versions
         let version_id = uuid::Uuid::new_v4().to_string();
         let snapshot = skill_version::ActiveModel {
             id: Set(version_id),
@@ -154,6 +170,7 @@ impl SkillRepository for SeaOrmSkillRepository {
         let new_version = current.version + 1;
         let active = skill::ActiveModel {
             id: Set(entity.id.clone()),
+            tenant_id: Set(entity.tenant_id.clone()),
             name: Set(entity.name.clone()),
             description: Set(entity.description.clone()),
             parameters_schema: Set(entity.parameters_schema.clone()),
@@ -243,6 +260,7 @@ impl SkillRepository for SeaOrmSkillRepository {
         let new_version = current.version + 1;
         let active = skill::ActiveModel {
             id: Set(skill_id.to_string()),
+            tenant_id: Set(current.tenant_id),
             name: Set(current.name),
             description: Set(snapshot.description),
             parameters_schema: Set(snapshot.parameters_schema),

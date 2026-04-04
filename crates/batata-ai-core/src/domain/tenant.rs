@@ -2,14 +2,12 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RoutingPolicyDefinition {
+pub struct Tenant {
     pub id: String,
-    pub tenant_id: Option<String>,
     pub name: String,
-    pub policy_type: String,
-    pub config: serde_json::Value,
+    pub slug: String,
+    pub config: Option<serde_json::Value>,
     pub enabled: bool,
-    pub priority: i32,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub deleted_at: Option<NaiveDateTime>,

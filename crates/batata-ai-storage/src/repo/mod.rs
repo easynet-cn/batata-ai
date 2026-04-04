@@ -1,4 +1,7 @@
 pub(crate) mod soft_delete;
+mod api_key;
+mod conversation;
+mod conversation_message;
 mod model;
 mod model_cost;
 mod object_store_bucket;
@@ -9,7 +12,11 @@ mod request_log;
 mod routing_policy;
 mod skill;
 mod stored_object;
+mod tenant;
 
+pub use api_key::SeaOrmApiKeyRepository;
+pub use conversation::SeaOrmConversationRepository;
+pub use conversation_message::SeaOrmConversationMessageRepository;
 pub use model::SeaOrmModelRepository;
 pub use model_cost::SeaOrmModelCostRepository;
 pub use object_store_bucket::SeaOrmObjectStoreBucketRepository;
@@ -20,3 +27,4 @@ pub use request_log::SeaOrmRequestLogRepository;
 pub use routing_policy::SeaOrmRoutingPolicyRepository;
 pub use skill::SeaOrmSkillRepository;
 pub use stored_object::SeaOrmStoredObjectRepository;
+pub use tenant::SeaOrmTenantRepository;

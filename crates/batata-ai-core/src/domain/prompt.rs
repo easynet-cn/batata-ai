@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptDefinition {
     pub id: String,
+    pub tenant_id: Option<String>,
     pub name: String,
     pub description: String,
     pub template: String,

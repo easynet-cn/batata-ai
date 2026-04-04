@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestLog {
     pub id: String,
+    pub tenant_id: String,
     pub provider_id: String,
     pub provider_name: String,
     pub model_identifier: String,
