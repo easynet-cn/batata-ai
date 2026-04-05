@@ -6,7 +6,7 @@ use crate::domain::{
     ApiKey, Conversation, ConversationMessage, ModelCost, ModelDefinition, ModelProvider,
     ModelType, ObjectStoreBucket, ObjectStoreConfig, PromptDefinition, PromptVersion,
     ProviderDefinition, RequestLog, RoutingPolicyDefinition, SkillDefinition, SkillVersion,
-    StoredObject, Tenant,
+    StoredObject, Tenant, TenantUsage, User,
 };
 use crate::error::Result;
 
@@ -36,6 +36,16 @@ pub trait Repository<T: Send + Sync>: Send + Sync {
 pub trait TenantRepository: Repository<Tenant> {
     async fn find_by_slug(&self, slug: &str) -> Result<Option<Tenant>>;
     async fn find_enabled(&self) -> Result<Vec<Tenant>>;
+}
+
+// ---------------------------------------------------------------------------
+// User
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+pub trait UserRepository: Repository<User> {
+    async fn find_by_tenant(&self, tenant_id: &str) -> Result<Vec<User>>;
+    async fn find_by_username(&self, tenant_id: &str, username: &str) -> Result<Option<User>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -256,4 +266,24 @@ pub trait ConversationMessageRepository: Send + Sync {
         page_size: u64,
     ) -> Result<Vec<ConversationMessage>>;
     async fn count_by_conversation(&self, conversation_id: &str) -> Result<u64>;
+}
+
+// ---------------------------------------------------------------------------
+// Tenant Usage
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+pub trait TenantUsageRepository: Send + Sync {
+    async fn find_or_create(&self, tenant_id: &str, period: &str) -> Result<TenantUsage>;
+    async fn increment(
+        &self,
+        tenant_id: &str,
+        period: &str,
+        requests: i64,
+        prompt_tokens: i64,
+        completion_tokens: i64,
+        cost: f64,
+    ) -> Result<TenantUsage>;
+    async fn find_by_tenant_period(&self, tenant_id: &str, period: &str) -> Result<Option<TenantUsage>>;
+    async fn find_by_tenant(&self, tenant_id: &str, limit: u64) -> Result<Vec<TenantUsage>>;
 }

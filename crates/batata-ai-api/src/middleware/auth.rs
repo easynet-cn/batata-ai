@@ -1,21 +1,26 @@
+use std::cell::RefCell;
 use std::future::{ready, Ready};
+use std::rc::Rc;
 use std::sync::Arc;
 
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::error::ErrorUnauthorized;
-use actix_web::{web, Error};
+use actix_web::{web, Error, HttpMessage};
 use futures::future::LocalBoxFuture;
 use sha2::{Digest, Sha256};
 
 use batata_ai_core::domain::ApiKey;
 use batata_ai_core::repository::ApiKeyRepository;
 
-/// Authenticated tenant context, injected into request extensions.
+/// Authenticated context, injected into request extensions.
 #[derive(Debug, Clone)]
 pub struct AuthContext {
     pub tenant_id: String,
+    pub user_id: Option<String>,
     pub api_key_id: String,
     pub scopes: serde_json::Value,
+    /// Requests per minute; 0 means unlimited.
+    pub rate_limit: i32,
 }
 
 /// API Key authentication middleware factory.
@@ -34,12 +39,14 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(ApiKeyAuthMiddleware { service }))
+        ready(Ok(ApiKeyAuthMiddleware {
+            service: Rc::new(RefCell::new(service)),
+        }))
     }
 }
 
 pub struct ApiKeyAuthMiddleware<S> {
-    service: S,
+    service: Rc<RefCell<S>>,
 }
 
 impl<S, B> Service<ServiceRequest> for ApiKeyAuthMiddleware<S>
@@ -57,7 +64,7 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         // Skip auth for health check
         if req.path() == "/health" {
-            let fut = self.service.call(req);
+            let fut = self.service.borrow_mut().call(req);
             return Box::pin(async move { fut.await });
         }
 
@@ -71,20 +78,23 @@ where
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
 
-        let fut = self.service.call(req);
+        // Extract token before async block
+        let token = auth_header
+            .as_ref()
+            .and_then(|h| h.strip_prefix("Bearer ").map(|s| s.to_string()));
+
+        let svc = self.service.clone();
 
         Box::pin(async move {
-            let header = auth_header.ok_or_else(|| ErrorUnauthorized("missing Authorization header"))?;
-
-            let token = header
-                .strip_prefix("Bearer ")
-                .ok_or_else(|| ErrorUnauthorized("invalid Authorization format, expected: Bearer <key>"))?;
+            let token = token.ok_or_else(|| {
+                ErrorUnauthorized("missing or invalid Authorization header")
+            })?;
 
             let repo = api_key_repo
                 .ok_or_else(|| ErrorUnauthorized("internal: api key repo not configured"))?;
 
             // Hash the provided key
-            let key_hash = hash_api_key(token);
+            let key_hash = hash_api_key(&token);
 
             let api_key: ApiKey = repo
                 .find_by_key_hash(&key_hash)
@@ -107,11 +117,18 @@ where
             // Update last_used_at (fire-and-forget)
             let _ = repo.touch_last_used(&api_key.id).await;
 
-            // TODO: Inject AuthContext into request extensions
-            // req.extensions_mut().insert(AuthContext { ... });
-            // This requires restructuring since we consumed req in service.call()
+            // Insert AuthContext into request extensions so downstream
+            // middleware (CasbinAuthz, RateLimit) and handlers can access it.
+            let auth_ctx = AuthContext {
+                tenant_id: api_key.tenant_id,
+                user_id: None, // TODO: resolve from api_key.user_id once column is populated
+                api_key_id: api_key.id,
+                scopes: api_key.scopes,
+                rate_limit: api_key.rate_limit.unwrap_or(0),
+            };
+            req.extensions_mut().insert(auth_ctx);
 
-            fut.await
+            svc.borrow_mut().call(req).await
         })
     }
 }

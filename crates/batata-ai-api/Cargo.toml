@@ -8,12 +8,16 @@ description = "HTTP API gateway for batata-ai using actix-web"
 
 [dependencies]
 batata-ai-core.workspace = true
+batata-ai-local.workspace = true
+batata-ai-provider = { workspace = true, features = ["all"] }
 batata-ai-storage.workspace = true
 batata-ai-router.workspace = true
 
 # Web framework
 actix-web = "4"
 actix-rt = "2"
+actix-cors = "0.7"
+actix-web-lab = "0.24"
 
 # Async
 async-trait.workspace = true
@@ -26,6 +30,9 @@ serde_json.workspace = true
 # Auth
 sha2 = "0.10"
 hex = "0.4"
+argon2 = { workspace = true }
+casbin = { workspace = true }
+sea-orm-adapter = { workspace = true, features = ["sqlite", "runtime-tokio-rustls"] }
 
 # Utils
 chrono.workspace = true

@@ -486,6 +486,45 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // tenant_usages
+        manager
+            .create_table(
+                Table::create()
+                    .table(TenantUsages::Table)
+                    .if_not_exists()
+                    .col(string(TenantUsages::Id).primary_key())
+                    .col(string(TenantUsages::TenantId).not_null())
+                    .col(string(TenantUsages::Period).not_null())
+                    .col(big_integer(TenantUsages::TotalRequests).not_null().default(0))
+                    .col(big_integer(TenantUsages::TotalPromptTokens).not_null().default(0))
+                    .col(big_integer(TenantUsages::TotalCompletionTokens).not_null().default(0))
+                    .col(big_integer(TenantUsages::TotalTokens).not_null().default(0))
+                    .col(double(TenantUsages::EstimatedCost).not_null().default(0))
+                    .col(timestamp(TenantUsages::CreatedAt).not_null())
+                    .col(timestamp(TenantUsages::UpdatedAt).not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_tenant_usages_tenant")
+                            .from(TenantUsages::Table, TenantUsages::TenantId)
+                            .to(Tenants::Table, Tenants::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_tenant_usages_tenant_period")
+                    .table(TenantUsages::Table)
+                    .col(TenantUsages::TenantId)
+                    .col(TenantUsages::Period)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
         // conversation_messages
         manager
             .create_table(
@@ -522,6 +561,9 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .drop_table(Table::drop().table(ConversationMessages::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(TenantUsages::Table).to_owned())
             .await?;
         manager
             .drop_table(Table::drop().table(Conversations::Table).to_owned())
@@ -823,6 +865,21 @@ enum Conversations {
     CreatedAt,
     UpdatedAt,
     DeletedAt,
+}
+
+#[derive(DeriveIden)]
+enum TenantUsages {
+    Table,
+    Id,
+    TenantId,
+    Period,
+    TotalRequests,
+    TotalPromptTokens,
+    TotalCompletionTokens,
+    TotalTokens,
+    EstimatedCost,
+    CreatedAt,
+    UpdatedAt,
 }
 
 #[derive(DeriveIden)]

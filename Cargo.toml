@@ -10,6 +10,7 @@ members = [
     "crates/batata-ai-router",
     "crates/batata-ai-object-store",
     "crates/batata-ai-api",
+    "crates/batata-ai-server",
 ]
 
 [workspace.package]
@@ -50,6 +51,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # AI frameworks
 rig-core = "0.34"
 
+# Authorization
+casbin = { version = "2", default-features = false, features = ["runtime-tokio", "incremental"] }
+sea-orm-adapter = { version = "0.4", default-features = false }
+
 # MCP
 rmcp = { version = "1", features = ["client", "server", "macros", "transport-streamable-http-server"] }
 
@@ -66,6 +71,9 @@ tokenizers = "0.22"
 
 # Stream utilities
 tokio-stream = "0.1"
+
+# Password hashing
+argon2 = "0.5"
 
 # HTTP
 reqwest = { version = "0.12", features = ["json"] }
@@ -95,11 +103,15 @@ batata-ai-prompt.workspace = true
 batata-ai-local.workspace = true
 batata-ai-storage.workspace = true
 batata-ai-router.workspace = true
-
-[dev-dependencies]
+batata-ai-api.workspace = true
 tokio.workspace = true
 anyhow.workspace = true
-tracing-subscriber.workspace = true
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+casbin = { workspace = true }
+sea-orm-adapter = { workspace = true, features = ["sqlite", "runtime-tokio-rustls"] }
+
+[dev-dependencies]
 futures.workspace = true
 
 [[example]]
@@ -122,3 +134,7 @@ name = "download_model"
 
 [[example]]
 name = "mcp_http_server"
+
+[[example]]
+name = "api_server"
+required-features = []

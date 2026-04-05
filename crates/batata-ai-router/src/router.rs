@@ -38,6 +38,14 @@ impl Router {
             .map(|(_, p)| p)
     }
 
+    /// List registered providers as (id, name) pairs.
+    pub fn list_providers(&self) -> Vec<(String, String)> {
+        self.providers
+            .iter()
+            .map(|(id, p)| (id.clone(), p.name().to_string()))
+            .collect()
+    }
+
     /// Get the name of the active routing policy.
     pub fn policy_name(&self) -> &str {
         self.policy.name()

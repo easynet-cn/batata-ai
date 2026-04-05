@@ -1,0 +1,28 @@
+[package]
+name = "batata-ai-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "batata-ai API server binary"
+
+[[bin]]
+name = "batata-ai-server"
+path = "src/main.rs"
+
+[dependencies]
+batata-ai-core.workspace = true
+batata-ai-storage.workspace = true
+batata-ai-router.workspace = true
+batata-ai-api.workspace = true
+batata-ai-local.workspace = true
+batata-ai-provider = { workspace = true, features = ["all"] }
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+casbin = { workspace = true }
+sea-orm-adapter = { workspace = true, features = ["sqlite", "runtime-tokio-rustls"] }

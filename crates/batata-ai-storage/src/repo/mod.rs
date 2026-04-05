@@ -13,6 +13,8 @@ mod routing_policy;
 mod skill;
 mod stored_object;
 mod tenant;
+mod tenant_usage;
+mod user;
 
 pub use api_key::SeaOrmApiKeyRepository;
 pub use conversation::SeaOrmConversationRepository;
@@ -28,3 +30,5 @@ pub use routing_policy::SeaOrmRoutingPolicyRepository;
 pub use skill::SeaOrmSkillRepository;
 pub use stored_object::SeaOrmStoredObjectRepository;
 pub use tenant::SeaOrmTenantRepository;
+pub use tenant_usage::SeaOrmTenantUsageRepository;
+pub use user::SeaOrmUserRepository;

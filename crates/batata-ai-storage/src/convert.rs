@@ -2,7 +2,8 @@ use batata_ai_core::domain::{
     ApiKey, BucketAccessPolicy, Conversation, ConversationMessage, ModelCost, ModelDefinition,
     ModelProvider, ModelType, ObjectStoreBackend, ObjectStoreBucket, ObjectStoreConfig,
     PromptDefinition, PromptVersion, ProviderDefinition, RequestLog, RequestStatus,
-    RoutingPolicyDefinition, SkillDefinition, SkillVersion, StoredObject, Tenant,
+    RoutingPolicyDefinition, SkillDefinition, SkillVersion, StoredObject, Tenant, TenantUsage,
+    User,
 };
 
 use crate::entity;
@@ -291,6 +292,28 @@ impl From<entity::request_log::Model> for RequestLog {
 }
 
 // ---------------------------------------------------------------------------
+// User
+// ---------------------------------------------------------------------------
+
+impl From<entity::user::Model> for User {
+    fn from(m: entity::user::Model) -> Self {
+        Self {
+            id: m.id,
+            tenant_id: m.tenant_id,
+            username: m.username,
+            password_hash: m.password_hash,
+            display_name: m.display_name,
+            email: m.email,
+            enabled: m.enabled,
+            last_login_at: m.last_login_at,
+            created_at: m.created_at,
+            updated_at: m.updated_at,
+            deleted_at: m.deleted_at,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tenant
 // ---------------------------------------------------------------------------
 
@@ -349,6 +372,27 @@ impl From<entity::conversation::Model> for Conversation {
             created_at: m.created_at,
             updated_at: m.updated_at,
             deleted_at: m.deleted_at,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TenantUsage
+// ---------------------------------------------------------------------------
+
+impl From<entity::tenant_usage::Model> for TenantUsage {
+    fn from(m: entity::tenant_usage::Model) -> Self {
+        Self {
+            id: m.id,
+            tenant_id: m.tenant_id,
+            period: m.period,
+            total_requests: m.total_requests,
+            total_prompt_tokens: m.total_prompt_tokens,
+            total_completion_tokens: m.total_completion_tokens,
+            total_tokens: m.total_tokens,
+            estimated_cost: m.estimated_cost,
+            created_at: m.created_at,
+            updated_at: m.updated_at,
         }
     }
 }

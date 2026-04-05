@@ -15,24 +15,26 @@ Rust-based AI platform (AI底座) — workspace project.
 All crates use `batata-ai-` prefix (e.g., `batata-ai-core`).
 
 ## Structure (9 crates)
-- `crates/batata-ai-core` — Core traits, domain models, repository traits, routing abstractions
+- `crates/batata-ai-core` — Core traits, domain models, repository traits, routing/cache/guardrail abstractions
 - `crates/batata-ai-provider` — Provider implementations (OpenAI, Anthropic, Ollama, OpenRouter)
 - `crates/batata-ai-mcp` — MCP server/client (rmcp)
 - `crates/batata-ai-prompt` — Prompt template engine
 - `crates/batata-ai-local` — Local candle inference engine
-- `crates/batata-ai-storage` — sea-orm based persistence (17 tables)
-- `crates/batata-ai-router` — Routing engine with policy-based provider selection
+- `crates/batata-ai-storage` — sea-orm based persistence (18 tables)
+- `crates/batata-ai-router` — Routing engine, cache, guardrails implementations
 - `crates/batata-ai-object-store` — Object storage backends (local/S3/OSS)
 - `crates/batata-ai-api` — HTTP API gateway (actix-web)
 - `src/lib.rs` — Facade re-exports
 
 ## Core Module Layout
-- `domain/` — Domain models: model, provider, prompt, skill, routing, cost, object_store, request_log, tenant, api_key, conversation
-- `repository.rs` — Repository trait abstractions (generic CRUD + specialized queries)
+- `domain/` — 13 domain models: model, provider, prompt, skill, routing, cost, object_store, request_log, tenant, api_key, conversation, usage
+- `repository.rs` — 15 repository trait abstractions
 - `routing.rs` — Runtime routing traits (RoutingPolicy, StatusStore, ProviderStatus)
+- `cache.rs` — CacheStore + CacheKeyStrategy traits
+- `guardrail.rs` — Guardrail trait + GuardrailPipeline
 - `object_store.rs` — ObjectStore trait for file operations
 
-## Database (17 tables)
+## Database (18 tables)
 
 ### Platform-level (no tenant_id)
 - `providers`, `models`, `model_providers` — AI provider/model management (many-to-many)
@@ -52,21 +54,28 @@ All crates use `batata-ai-` prefix (e.g., `batata-ai-core`).
 - `conversation_messages` — Chat messages (no soft delete)
 - `request_logs` — Request audit logging (no soft delete)
 - `stored_objects` — File metadata
+- `tenant_usages` — Usage tracking per period (no soft delete)
 
 ## API Gateway (actix-web)
 - `GET /health` — Health check
 - `GET /v1/models` — List models
-- `POST /v1/chat/completions` — OpenAI-compatible chat
+- `POST /v1/chat/completions` — OpenAI-compatible chat (with cache + guardrails)
 - `CRUD /v1/conversations` — Conversation management
 - `GET /v1/conversations/{id}/messages` — Message history
-- Auth: Bearer token (API Key → SHA-256 hash lookup → tenant context)
+- `GET /v1/usage` — Tenant usage statistics
+- Middleware: auth (API Key), rate limiting (token bucket), request tracing
 
 ## Cross-cutting Features
 - **Multi-tenancy**: Three categories (platform / mixed / tenant-level)
-- **Soft delete**: `deleted_at` timestamp on 14 tables (excludes version history, messages, audit logs)
-- **Versioning**: Prompts and Skills auto-snapshot to history tables on update, support rollback
-- **Enabled/disabled**: Three-layer check for routing: provider.enabled → model.enabled → model_provider.enabled
-- **Auth**: API Key with SHA-256 hash, scopes, rate_limit, expiration
+- **Soft delete**: `deleted_at` timestamp on 14 tables
+- **Versioning**: Prompts and Skills auto-snapshot + rollback
+- **Routing**: 6 policies (priority/cost/latency/weighted/fallback/chain) + auto-failover
+- **Cache**: CacheStore trait + InMemoryCache with TTL, integrated in chat handler
+- **Guardrails**: KeywordFilter + LengthLimit, input/output dual-direction filtering
+- **Rate limiting**: Per-API-key token bucket
+- **Usage tracking**: Per-tenant request/token/cost aggregation by period
+- **Auth**: API Key (SHA-256 hash, scopes, rate_limit, expiration)
+- **Observability**: Request tracing middleware (method, path, status, latency)
 
 ## Conventions
 - Rust 2024 edition

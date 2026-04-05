@@ -15,3 +15,5 @@ pub mod skill;
 pub mod skill_version;
 pub mod stored_object;
 pub mod tenant;
+pub mod tenant_usage;
+pub mod user;

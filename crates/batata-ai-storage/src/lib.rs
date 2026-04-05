@@ -12,7 +12,8 @@ pub use repo::{
     SeaOrmModelCostRepository, SeaOrmModelRepository, SeaOrmObjectStoreBucketRepository,
     SeaOrmObjectStoreConfigRepository, SeaOrmPromptRepository, SeaOrmProviderRepository,
     SeaOrmRequestLogRepository, SeaOrmRoutingPolicyRepository, SeaOrmSkillRepository,
-    SeaOrmStoredObjectRepository, SeaOrmTenantRepository,
+    SeaOrmStoredObjectRepository, SeaOrmTenantRepository, SeaOrmTenantUsageRepository,
+    SeaOrmUserRepository,
 };
 
 /// Connect to database and run pending migrations.

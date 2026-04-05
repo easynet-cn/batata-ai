@@ -10,6 +10,8 @@ mod request_log;
 mod routing;
 mod skill;
 mod tenant;
+mod usage;
+mod user;
 
 pub use api_key::*;
 pub use conversation::*;
@@ -23,3 +25,5 @@ pub use request_log::*;
 pub use routing::*;
 pub use skill::*;
 pub use tenant::*;
+pub use usage::*;
+pub use user::*;
