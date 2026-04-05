@@ -2,6 +2,8 @@ pub use sea_orm_migration::prelude::*;
 
 mod m20260404_000001_init;
 mod m20260405_000001_users;
+mod m20260405_000002_encrypt_secrets;
+mod m20260405_000003_app_key;
 
 pub struct Migrator;
 
@@ -11,6 +13,8 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20260404_000001_init::Migration),
             Box::new(m20260405_000001_users::Migration),
+            Box::new(m20260405_000002_encrypt_secrets::Migration),
+            Box::new(m20260405_000003_app_key::Migration),
         ]
     }
 }

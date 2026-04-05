@@ -344,6 +344,8 @@ impl From<entity::api_key::Model> for ApiKey {
             name: m.name,
             key_hash: m.key_hash,
             key_prefix: m.key_prefix,
+            app_key: m.app_key,
+            app_secret_hash: m.app_secret_hash,
             scopes: m.scopes,
             rate_limit: m.rate_limit,
             expires_at: m.expires_at,

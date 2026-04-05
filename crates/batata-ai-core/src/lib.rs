@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod crypto;
 pub mod config;
 pub mod domain;
 pub mod error;

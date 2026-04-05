@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use sea_orm::*;
 
+use batata_ai_core::crypto::Encryptor;
 use batata_ai_core::domain::{ModelDefinition, ProviderDefinition};
 use batata_ai_core::error::{BatataError, Result};
 use batata_ai_core::repository::{ProviderRepository, Repository};
@@ -9,11 +10,21 @@ use crate::entity::{model, model_provider, provider};
 
 pub struct SeaOrmProviderRepository {
     db: DatabaseConnection,
+    encryptor: Encryptor,
 }
 
 impl SeaOrmProviderRepository {
-    pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+    pub fn new(db: DatabaseConnection, encryptor: Encryptor) -> Self {
+        Self { db, encryptor }
+    }
+
+    fn encrypt_api_key(&self, provider: &ProviderDefinition) -> Result<Option<String>> {
+        self.encryptor.encrypt_opt(&provider.api_key)
+    }
+
+    fn decrypt_provider(&self, mut provider: ProviderDefinition) -> Result<ProviderDefinition> {
+        provider.api_key = self.encryptor.decrypt_opt(&provider.api_key)?;
+        Ok(provider)
     }
 }
 
@@ -24,29 +35,35 @@ fn map_db_err(e: DbErr) -> BatataError {
 #[async_trait]
 impl Repository<ProviderDefinition> for SeaOrmProviderRepository {
     async fn find_by_id(&self, id: &str) -> Result<Option<ProviderDefinition>> {
-        provider::Entity::find_by_id(id)
+        let opt = provider::Entity::find_by_id(id)
             .filter(provider::Column::DeletedAt.is_null())
             .one(&self.db)
             .await
-            .map(|opt| opt.map(Into::into))
-            .map_err(map_db_err)
+            .map_err(map_db_err)?;
+        match opt {
+            Some(m) => self.decrypt_provider(m.into()).map(Some),
+            None => Ok(None),
+        }
     }
 
     async fn find_all(&self) -> Result<Vec<ProviderDefinition>> {
-        provider::Entity::find()
+        let rows = provider::Entity::find()
             .filter(provider::Column::DeletedAt.is_null())
             .all(&self.db)
             .await
-            .map(|v| v.into_iter().map(Into::into).collect())
-            .map_err(map_db_err)
+            .map_err(map_db_err)?;
+        rows.into_iter()
+            .map(|m| self.decrypt_provider(m.into()))
+            .collect()
     }
 
     async fn create(&self, entity: &ProviderDefinition) -> Result<ProviderDefinition> {
+        let encrypted_api_key = self.encrypt_api_key(entity)?;
         let active = provider::ActiveModel {
             id: Set(entity.id.clone()),
             name: Set(entity.name.clone()),
             provider_type: Set(entity.provider_type.clone()),
-            api_key: Set(entity.api_key.clone()),
+            api_key: Set(encrypted_api_key),
             base_url: Set(entity.base_url.clone()),
             config: Set(entity.config.clone()),
             enabled: Set(entity.enabled),
@@ -58,15 +75,16 @@ impl Repository<ProviderDefinition> for SeaOrmProviderRepository {
             .exec_with_returning(&self.db)
             .await
             .map_err(map_db_err)?;
-        Ok(result.into())
+        self.decrypt_provider(result.into())
     }
 
     async fn update(&self, entity: &ProviderDefinition) -> Result<ProviderDefinition> {
+        let encrypted_api_key = self.encrypt_api_key(entity)?;
         let active = provider::ActiveModel {
             id: Set(entity.id.clone()),
             name: Set(entity.name.clone()),
             provider_type: Set(entity.provider_type.clone()),
-            api_key: Set(entity.api_key.clone()),
+            api_key: Set(encrypted_api_key),
             base_url: Set(entity.base_url.clone()),
             config: Set(entity.config.clone()),
             enabled: Set(entity.enabled),
@@ -78,7 +96,7 @@ impl Repository<ProviderDefinition> for SeaOrmProviderRepository {
             .exec(&self.db)
             .await
             .map_err(map_db_err)?;
-        Ok(result.into())
+        self.decrypt_provider(result.into())
     }
 
     async fn delete(&self, id: &str) -> Result<bool> {
@@ -97,23 +115,28 @@ impl Repository<ProviderDefinition> for SeaOrmProviderRepository {
 #[async_trait]
 impl ProviderRepository for SeaOrmProviderRepository {
     async fn find_by_name(&self, name: &str) -> Result<Option<ProviderDefinition>> {
-        provider::Entity::find()
+        let opt = provider::Entity::find()
             .filter(provider::Column::Name.eq(name))
             .filter(provider::Column::DeletedAt.is_null())
             .one(&self.db)
             .await
-            .map(|opt| opt.map(Into::into))
-            .map_err(map_db_err)
+            .map_err(map_db_err)?;
+        match opt {
+            Some(m) => self.decrypt_provider(m.into()).map(Some),
+            None => Ok(None),
+        }
     }
 
     async fn find_enabled(&self) -> Result<Vec<ProviderDefinition>> {
-        provider::Entity::find()
+        let rows = provider::Entity::find()
             .filter(provider::Column::Enabled.eq(true))
             .filter(provider::Column::DeletedAt.is_null())
             .all(&self.db)
             .await
-            .map(|v| v.into_iter().map(Into::into).collect())
-            .map_err(map_db_err)
+            .map_err(map_db_err)?;
+        rows.into_iter()
+            .map(|m| self.decrypt_provider(m.into()))
+            .collect()
     }
 
     async fn find_models(&self, provider_id: &str) -> Result<Vec<ModelDefinition>> {

@@ -1,6 +1,7 @@
 use actix_web::{delete, get, post, web, HttpResponse};
 use std::sync::Arc;
 
+use batata_ai_core::crypto::generate_app_key_pair;
 use batata_ai_core::domain::ApiKey;
 use batata_ai_core::repository::ApiKeyRepository;
 
@@ -20,8 +21,13 @@ pub struct CreateApiKeyResponse {
     pub id: String,
     pub tenant_id: String,
     pub name: String,
+    /// Bearer token (only returned on creation, store it safely).
     pub key: String,
     pub key_prefix: String,
+    /// App key for dual-key auth (public identifier).
+    pub app_key: String,
+    /// App secret for dual-key auth (only returned on creation, store it safely).
+    pub app_secret: String,
     pub scopes: serde_json::Value,
     pub rate_limit: Option<i32>,
     pub expires_at: Option<chrono::NaiveDateTime>,
@@ -38,8 +44,13 @@ pub async fn create_api_key(
     api_key_repo: web::Data<Arc<dyn ApiKeyRepository>>,
     body: web::Json<CreateApiKeyRequest>,
 ) -> actix_web::Result<HttpResponse> {
+    // Generate Bearer token
     let (plain_key, prefix) = generate_api_key();
     let key_hash = hash_api_key(&plain_key);
+
+    // Generate app_key + app_secret pair
+    let (app_key, app_secret) = generate_app_key_pair();
+    let app_secret_hash = hash_api_key(&app_secret);
 
     let now = chrono::Utc::now().naive_utc();
     let scopes = body.scopes.clone().unwrap_or(serde_json::json!(["*"]));
@@ -50,6 +61,8 @@ pub async fn create_api_key(
         name: body.name.clone(),
         key_hash,
         key_prefix: prefix.clone(),
+        app_key: Some(app_key.clone()),
+        app_secret_hash: Some(app_secret_hash),
         scopes: scopes.clone(),
         rate_limit: body.rate_limit,
         expires_at: body.expires_at,
@@ -65,13 +78,15 @@ pub async fn create_api_key(
         .await
         .map_err(actix_web::error::ErrorInternalServerError)?;
 
-    // Return the plain key only on creation
+    // Return credentials only on creation — client must store them safely.
     let response = CreateApiKeyResponse {
         id: result.id,
         tenant_id: result.tenant_id,
         name: result.name,
         key: plain_key,
         key_prefix: prefix,
+        app_key,
+        app_secret,
         scopes,
         rate_limit: result.rate_limit,
         expires_at: result.expires_at,

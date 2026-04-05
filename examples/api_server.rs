@@ -19,6 +19,7 @@ use casbin::CoreApi;
 use tokio::sync::RwLock;
 
 use batata_ai_core::cache::DefaultCacheKeyStrategy;
+use batata_ai_core::crypto::Encryptor;
 use batata_ai_router::{InMemoryCache, InMemoryStatusStore, PriorityPolicy, Router};
 use batata_ai_storage::{
     connect_and_migrate, SeaOrmApiKeyRepository, SeaOrmConversationMessageRepository,
@@ -44,6 +45,9 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|_| "sqlite://batata-ai.db?mode=rwc".to_string());
     let db = connect_and_migrate(&db_url).await?;
 
+    // Initialize encryptor for sensitive fields
+    let encryptor = Encryptor::from_env()?;
+
     // Initialize router with priority policy
     let status_store = Arc::new(InMemoryStatusStore::new());
     let router = Router::new(Box::new(PriorityPolicy), status_store);
@@ -67,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
         user_repo: Arc::new(SeaOrmUserRepository::new(db.clone())),
         api_key_repo: Arc::new(SeaOrmApiKeyRepository::new(db.clone())),
         model_repo: Arc::new(SeaOrmModelRepository::new(db.clone())),
-        provider_repo: Arc::new(SeaOrmProviderRepository::new(db.clone())),
+        provider_repo: Arc::new(SeaOrmProviderRepository::new(db.clone(), encryptor)),
         prompt_repo: Arc::new(SeaOrmPromptRepository::new(db.clone())),
         conversation_repo: Arc::new(SeaOrmConversationRepository::new(db.clone())),
         message_repo: Arc::new(SeaOrmConversationMessageRepository::new(db.clone())),

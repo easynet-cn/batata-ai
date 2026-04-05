@@ -10,6 +10,7 @@ use casbin::CoreApi;
 use batata_ai_api::middleware::RateLimiter;
 use batata_ai_api::provider_factory;
 use batata_ai_core::cache::DefaultCacheKeyStrategy;
+use batata_ai_core::crypto::Encryptor;
 use batata_ai_core::repository::ProviderRepository;
 use batata_ai_router::{InMemoryCache, InMemoryStatusStore, PriorityPolicy, Router};
 use batata_ai_storage::{
@@ -54,12 +55,15 @@ async fn main() -> Result<()> {
     // Connect to database and run migrations
     let db = connect_and_migrate(&args.database_url).await?;
 
+    // Initialize encryptor for sensitive fields
+    let encryptor = Encryptor::from_env()?;
+
     // Initialize router with priority policy
     let status_store = Arc::new(InMemoryStatusStore::new());
     let mut router = Router::new(Box::new(PriorityPolicy), status_store);
 
     // Load enabled providers from database and register with router
-    let provider_repo = SeaOrmProviderRepository::new(db.clone());
+    let provider_repo = SeaOrmProviderRepository::new(db.clone(), encryptor.clone());
     match provider_repo.find_enabled().await {
         Ok(providers) => {
             let mut ok_count = 0u32;
@@ -124,7 +128,7 @@ async fn main() -> Result<()> {
         user_repo: Arc::new(SeaOrmUserRepository::new(db.clone())),
         api_key_repo: Arc::new(SeaOrmApiKeyRepository::new(db.clone())),
         model_repo: Arc::new(SeaOrmModelRepository::new(db.clone())),
-        provider_repo: Arc::new(SeaOrmProviderRepository::new(db.clone())),
+        provider_repo: Arc::new(SeaOrmProviderRepository::new(db.clone(), encryptor)),
         prompt_repo: Arc::new(SeaOrmPromptRepository::new(db.clone())),
         conversation_repo: Arc::new(SeaOrmConversationRepository::new(db.clone())),
         message_repo: Arc::new(SeaOrmConversationMessageRepository::new(db.clone())),

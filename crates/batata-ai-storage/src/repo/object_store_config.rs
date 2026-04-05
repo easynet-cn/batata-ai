@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use sea_orm::*;
 
+use batata_ai_core::crypto::Encryptor;
 use batata_ai_core::domain::ObjectStoreConfig;
 use batata_ai_core::error::{BatataError, Result};
 use batata_ai_core::repository::{ObjectStoreConfigRepository, Repository};
@@ -9,11 +10,21 @@ use crate::entity::object_store_config;
 
 pub struct SeaOrmObjectStoreConfigRepository {
     db: DatabaseConnection,
+    encryptor: Encryptor,
 }
 
 impl SeaOrmObjectStoreConfigRepository {
-    pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+    pub fn new(db: DatabaseConnection, encryptor: Encryptor) -> Self {
+        Self { db, encryptor }
+    }
+
+    fn encrypt_secret(&self, config: &ObjectStoreConfig) -> Result<Option<String>> {
+        self.encryptor.encrypt_opt(&config.secret_key)
+    }
+
+    fn decrypt_config(&self, mut config: ObjectStoreConfig) -> Result<ObjectStoreConfig> {
+        config.secret_key = self.encryptor.decrypt_opt(&config.secret_key)?;
+        Ok(config)
     }
 }
 
@@ -24,24 +35,30 @@ fn map_db_err(e: DbErr) -> BatataError {
 #[async_trait]
 impl Repository<ObjectStoreConfig> for SeaOrmObjectStoreConfigRepository {
     async fn find_by_id(&self, id: &str) -> Result<Option<ObjectStoreConfig>> {
-        object_store_config::Entity::find_by_id(id)
+        let opt = object_store_config::Entity::find_by_id(id)
             .filter(object_store_config::Column::DeletedAt.is_null())
             .one(&self.db)
             .await
-            .map(|opt| opt.map(Into::into))
-            .map_err(map_db_err)
+            .map_err(map_db_err)?;
+        match opt {
+            Some(m) => self.decrypt_config(m.into()).map(Some),
+            None => Ok(None),
+        }
     }
 
     async fn find_all(&self) -> Result<Vec<ObjectStoreConfig>> {
-        object_store_config::Entity::find()
+        let rows = object_store_config::Entity::find()
             .filter(object_store_config::Column::DeletedAt.is_null())
             .all(&self.db)
             .await
-            .map(|v| v.into_iter().map(Into::into).collect())
-            .map_err(map_db_err)
+            .map_err(map_db_err)?;
+        rows.into_iter()
+            .map(|m| self.decrypt_config(m.into()))
+            .collect()
     }
 
     async fn create(&self, entity: &ObjectStoreConfig) -> Result<ObjectStoreConfig> {
+        let encrypted_secret = self.encrypt_secret(entity)?;
         let active = object_store_config::ActiveModel {
             id: Set(entity.id.clone()),
             name: Set(entity.name.clone()),
@@ -49,7 +66,7 @@ impl Repository<ObjectStoreConfig> for SeaOrmObjectStoreConfigRepository {
             endpoint: Set(entity.endpoint.clone()),
             region: Set(entity.region.clone()),
             access_key: Set(entity.access_key.clone()),
-            secret_key: Set(entity.secret_key.clone()),
+            secret_key: Set(encrypted_secret),
             enabled: Set(entity.enabled),
             config: Set(entity.config.clone()),
             created_at: Set(entity.created_at),
@@ -60,10 +77,11 @@ impl Repository<ObjectStoreConfig> for SeaOrmObjectStoreConfigRepository {
             .exec_with_returning(&self.db)
             .await
             .map_err(map_db_err)?;
-        Ok(result.into())
+        self.decrypt_config(result.into())
     }
 
     async fn update(&self, entity: &ObjectStoreConfig) -> Result<ObjectStoreConfig> {
+        let encrypted_secret = self.encrypt_secret(entity)?;
         let active = object_store_config::ActiveModel {
             id: Set(entity.id.clone()),
             name: Set(entity.name.clone()),
@@ -71,7 +89,7 @@ impl Repository<ObjectStoreConfig> for SeaOrmObjectStoreConfigRepository {
             endpoint: Set(entity.endpoint.clone()),
             region: Set(entity.region.clone()),
             access_key: Set(entity.access_key.clone()),
-            secret_key: Set(entity.secret_key.clone()),
+            secret_key: Set(encrypted_secret),
             enabled: Set(entity.enabled),
             config: Set(entity.config.clone()),
             created_at: Set(entity.created_at),
@@ -82,7 +100,7 @@ impl Repository<ObjectStoreConfig> for SeaOrmObjectStoreConfigRepository {
             .exec(&self.db)
             .await
             .map_err(map_db_err)?;
-        Ok(result.into())
+        self.decrypt_config(result.into())
     }
 
     async fn delete(&self, id: &str) -> Result<bool> {
@@ -101,22 +119,27 @@ impl Repository<ObjectStoreConfig> for SeaOrmObjectStoreConfigRepository {
 #[async_trait]
 impl ObjectStoreConfigRepository for SeaOrmObjectStoreConfigRepository {
     async fn find_by_name(&self, name: &str) -> Result<Option<ObjectStoreConfig>> {
-        object_store_config::Entity::find()
+        let opt = object_store_config::Entity::find()
             .filter(object_store_config::Column::Name.eq(name))
             .filter(object_store_config::Column::DeletedAt.is_null())
             .one(&self.db)
             .await
-            .map(|opt| opt.map(Into::into))
-            .map_err(map_db_err)
+            .map_err(map_db_err)?;
+        match opt {
+            Some(m) => self.decrypt_config(m.into()).map(Some),
+            None => Ok(None),
+        }
     }
 
     async fn find_enabled(&self) -> Result<Vec<ObjectStoreConfig>> {
-        object_store_config::Entity::find()
+        let rows = object_store_config::Entity::find()
             .filter(object_store_config::Column::Enabled.eq(true))
             .filter(object_store_config::Column::DeletedAt.is_null())
             .all(&self.db)
             .await
-            .map(|v| v.into_iter().map(Into::into).collect())
-            .map_err(map_db_err)
+            .map_err(map_db_err)?;
+        rows.into_iter()
+            .map(|m| self.decrypt_config(m.into()))
+            .collect()
     }
 }

@@ -10,6 +10,9 @@ pub struct Model {
     #[sea_orm(unique)]
     pub key_hash: String,
     pub key_prefix: String,
+    #[sea_orm(unique)]
+    pub app_key: Option<String>,
+    pub app_secret_hash: Option<String>,
     pub scopes: Json,
     pub rate_limit: Option<i32>,
     pub expires_at: Option<ChronoDateTime>,

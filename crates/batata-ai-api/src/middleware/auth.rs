@@ -72,35 +72,74 @@ where
             .app_data::<web::Data<Arc<dyn ApiKeyRepository>>>()
             .cloned();
 
+        // Extract credentials: Bearer token OR app_key + app_secret headers
         let auth_header = req
             .headers()
             .get("Authorization")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
 
-        // Extract token before async block
-        let token = auth_header
+        let bearer_token = auth_header
             .as_ref()
             .and_then(|h| h.strip_prefix("Bearer ").map(|s| s.to_string()));
+
+        let x_app_key = req
+            .headers()
+            .get("X-App-Key")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
+        let x_app_secret = req
+            .headers()
+            .get("X-App-Secret")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
 
         let svc = self.service.clone();
 
         Box::pin(async move {
-            let token = token.ok_or_else(|| {
-                ErrorUnauthorized("missing or invalid Authorization header")
-            })?;
-
             let repo = api_key_repo
                 .ok_or_else(|| ErrorUnauthorized("internal: api key repo not configured"))?;
 
-            // Hash the provided key
-            let key_hash = hash_api_key(&token);
+            let api_key: ApiKey = match (bearer_token, x_app_key, x_app_secret) {
+                // Mode 1: Bearer token auth
+                (Some(token), _, _) => {
+                    let key_hash = hash_api_key(&token);
+                    repo.find_by_key_hash(&key_hash)
+                        .await
+                        .map_err(|_| ErrorUnauthorized("internal error"))?
+                        .ok_or_else(|| ErrorUnauthorized("invalid API key"))?
+                }
+                // Mode 2: app_key + app_secret dual-key auth
+                (None, Some(app_key), Some(app_secret)) => {
+                    let found = repo
+                        .find_by_app_key(&app_key)
+                        .await
+                        .map_err(|_| ErrorUnauthorized("internal error"))?
+                        .ok_or_else(|| ErrorUnauthorized("invalid app key"))?;
 
-            let api_key: ApiKey = repo
-                .find_by_key_hash(&key_hash)
-                .await
-                .map_err(|_| ErrorUnauthorized("internal error"))?
-                .ok_or_else(|| ErrorUnauthorized("invalid API key"))?;
+                    // Verify app_secret against stored hash
+                    let secret_hash = hash_api_key(&app_secret);
+                    let stored_hash = found
+                        .app_secret_hash
+                        .as_deref()
+                        .ok_or_else(|| ErrorUnauthorized("app secret not configured"))?;
+                    if secret_hash != stored_hash {
+                        return Err(ErrorUnauthorized("invalid app secret"));
+                    }
+                    found
+                }
+                // Missing app_secret
+                (None, Some(_), None) => {
+                    return Err(ErrorUnauthorized("X-App-Secret header required"));
+                }
+                // No credentials at all
+                _ => {
+                    return Err(ErrorUnauthorized(
+                        "missing credentials: use Authorization Bearer or X-App-Key + X-App-Secret",
+                    ));
+                }
+            };
 
             // Check if key is enabled
             if !api_key.enabled {
@@ -121,7 +160,7 @@ where
             // middleware (CasbinAuthz, RateLimit) and handlers can access it.
             let auth_ctx = AuthContext {
                 tenant_id: api_key.tenant_id,
-                user_id: None, // TODO: resolve from api_key.user_id once column is populated
+                user_id: None,
                 api_key_id: api_key.id,
                 scopes: api_key.scopes,
                 rate_limit: api_key.rate_limit.unwrap_or(0),

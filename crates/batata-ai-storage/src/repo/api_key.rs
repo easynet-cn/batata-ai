@@ -48,6 +48,8 @@ impl Repository<ApiKey> for SeaOrmApiKeyRepository {
             name: Set(entity.name.clone()),
             key_hash: Set(entity.key_hash.clone()),
             key_prefix: Set(entity.key_prefix.clone()),
+            app_key: Set(entity.app_key.clone()),
+            app_secret_hash: Set(entity.app_secret_hash.clone()),
             scopes: Set(entity.scopes.clone()),
             rate_limit: Set(entity.rate_limit),
             expires_at: Set(entity.expires_at),
@@ -71,6 +73,8 @@ impl Repository<ApiKey> for SeaOrmApiKeyRepository {
             name: Set(entity.name.clone()),
             key_hash: Set(entity.key_hash.clone()),
             key_prefix: Set(entity.key_prefix.clone()),
+            app_key: Set(entity.app_key.clone()),
+            app_secret_hash: Set(entity.app_secret_hash.clone()),
             scopes: Set(entity.scopes.clone()),
             rate_limit: Set(entity.rate_limit),
             expires_at: Set(entity.expires_at),
@@ -115,6 +119,16 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
     async fn find_by_prefix(&self, prefix: &str) -> Result<Option<ApiKey>> {
         api_key::Entity::find()
             .filter(api_key::Column::KeyPrefix.eq(prefix))
+            .filter(api_key::Column::DeletedAt.is_null())
+            .one(&self.db)
+            .await
+            .map(|opt| opt.map(Into::into))
+            .map_err(map_db_err)
+    }
+
+    async fn find_by_app_key(&self, app_key: &str) -> Result<Option<ApiKey>> {
+        api_key::Entity::find()
+            .filter(api_key::Column::AppKey.eq(app_key))
             .filter(api_key::Column::DeletedAt.is_null())
             .one(&self.db)
             .await

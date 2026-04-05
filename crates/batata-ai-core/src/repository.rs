@@ -54,10 +54,12 @@ pub trait UserRepository: Repository<User> {
 
 #[async_trait]
 pub trait ApiKeyRepository: Repository<ApiKey> {
-    /// Look up by key hash (for auth).
+    /// Look up by key hash (for Bearer token auth).
     async fn find_by_key_hash(&self, key_hash: &str) -> Result<Option<ApiKey>>;
     /// Look up by key prefix (for display).
     async fn find_by_prefix(&self, prefix: &str) -> Result<Option<ApiKey>>;
+    /// Look up by app_key (for app_key + app_secret dual-key auth).
+    async fn find_by_app_key(&self, app_key: &str) -> Result<Option<ApiKey>>;
     /// Find all keys for a tenant.
     async fn find_by_tenant(&self, tenant_id: &str) -> Result<Vec<ApiKey>>;
     /// Update last_used_at timestamp.

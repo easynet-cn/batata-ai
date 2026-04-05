@@ -17,3 +17,6 @@ uuid.workspace = true
 chrono.workspace = true
 tracing.workspace = true
 dirs = "6"
+aes-gcm = "0.10"
+base64 = "0.22"
+hex = "0.4"
