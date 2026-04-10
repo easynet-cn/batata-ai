@@ -208,43 +208,7 @@ impl LocalModel {
         let content = gguf_file::Content::read(&mut file)
             .map_err(|e| BatataError::Inference(format!("failed to read GGUF: {e}")))?;
 
-        let backend = match descriptor.arch {
-            ModelArch::Phi3 => {
-                let m = candle_transformers::models::quantized_phi3::ModelWeights::from_gguf(
-                    false, content, &mut file, device,
-                )
-                .map_err(|e| BatataError::Inference(format!("failed to load Phi-3: {e}")))?;
-                ModelBackend::Phi3(m)
-            }
-            ModelArch::Llama => {
-                let m = candle_transformers::models::quantized_llama::ModelWeights::from_gguf(
-                    content, &mut file, device,
-                )
-                .map_err(|e| BatataError::Inference(format!("failed to load Llama: {e}")))?;
-                ModelBackend::Llama(m)
-            }
-            ModelArch::Qwen2 => {
-                let m = candle_transformers::models::quantized_qwen2::ModelWeights::from_gguf(
-                    content, &mut file, device,
-                )
-                .map_err(|e| BatataError::Inference(format!("failed to load Qwen2: {e}")))?;
-                ModelBackend::Qwen2(m)
-            }
-            ModelArch::Qwen3 => {
-                let m = candle_transformers::models::quantized_qwen3::ModelWeights::from_gguf(
-                    content, &mut file, device,
-                )
-                .map_err(|e| BatataError::Inference(format!("failed to load Qwen3: {e}")))?;
-                ModelBackend::Qwen3(m)
-            }
-            ModelArch::Gemma3 => {
-                let m = candle_transformers::models::quantized_gemma3::ModelWeights::from_gguf(
-                    content, &mut file, device,
-                )
-                .map_err(|e| BatataError::Inference(format!("failed to load Gemma3: {e}")))?;
-                ModelBackend::Gemma3(m)
-            }
-        };
+        let backend = Self::load_backend(descriptor.arch, content, &mut file, device)?;
 
         let tokenizer = Tokenizer::from_file(tokenizer_path)
             .map_err(|e| BatataError::Inference(format!("failed to load tokenizer: {e}")))?;
@@ -257,6 +221,150 @@ impl LocalModel {
             device: device.clone(),
             descriptor,
         })
+    }
+
+    /// Auto-detect model architecture from GGUF metadata and load.
+    ///
+    /// Reads the `general.architecture` field from GGUF metadata to determine
+    /// the correct model backend. Falls back to the descriptor's arch if metadata
+    /// is unavailable.
+    ///
+    /// This allows loading any GGUF file without manually specifying architecture,
+    /// supporting all quantization formats (Q4_0, Q4_K_M, Q5_K_M, Q8_0, etc.)
+    /// as long as the model architecture is supported.
+    pub fn load_auto(
+        model_path: &Path,
+        tokenizer_path: &Path,
+        device: &Device,
+    ) -> Result<Self> {
+        info!("auto-detecting model from {}", model_path.display());
+
+        let mut file = std::fs::File::open(model_path)
+            .map_err(|e| BatataError::Inference(format!("failed to open model: {e}")))?;
+
+        let content = gguf_file::Content::read(&mut file)
+            .map_err(|e| BatataError::Inference(format!("failed to read GGUF: {e}")))?;
+
+        // Read architecture from GGUF metadata
+        let arch = Self::detect_arch_from_metadata(&content)?;
+
+        info!(arch = ?arch, "detected model architecture from GGUF metadata");
+
+        // Determine chat template and EOS tokens from arch
+        let (chat_template, eos_tokens) = match arch {
+            ModelArch::Phi3 => (ChatTemplate::Phi3, vec!["<|end|>".into(), "<|endoftext|>".into()]),
+            ModelArch::Llama => (ChatTemplate::Llama3, vec!["<|eot_id|>".into(), "<|end_of_text|>".into()]),
+            ModelArch::Qwen2 => (ChatTemplate::ChatML, vec!["<|im_end|>".into(), "<|endoftext|>".into()]),
+            ModelArch::Qwen3 => (ChatTemplate::ChatML, vec!["<|im_end|>".into(), "<|endoftext|>".into()]),
+            ModelArch::Gemma3 => (ChatTemplate::Gemma, vec!["<end_of_turn>".into(), "<eos>".into()]),
+        };
+
+        let name = model_path
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        let descriptor = ModelDescriptor {
+            arch,
+            name: name.clone(),
+            repo_id: String::new(),
+            filenames: vec![],
+            tokenizer_repo: String::new(),
+            chat_template,
+            eos_tokens,
+        };
+
+        let backend = Self::load_backend(arch, content, &mut file, device)?;
+
+        let tokenizer = Tokenizer::from_file(tokenizer_path)
+            .map_err(|e| BatataError::Inference(format!("failed to load tokenizer: {e}")))?;
+
+        info!("{name} model loaded successfully (auto-detected)");
+
+        Ok(Self {
+            backend,
+            tokenizer,
+            device: device.clone(),
+            descriptor,
+        })
+    }
+
+    /// Detect `ModelArch` from GGUF metadata `general.architecture` field.
+    fn detect_arch_from_metadata(content: &gguf_file::Content) -> Result<ModelArch> {
+        let arch_value = content
+            .metadata
+            .get("general.architecture")
+            .ok_or_else(|| {
+                BatataError::Inference(
+                    "GGUF file missing 'general.architecture' metadata".to_string(),
+                )
+            })?;
+
+        let arch_str = match arch_value {
+            gguf_file::Value::String(s) => s.as_str(),
+            _ => {
+                return Err(BatataError::Inference(
+                    "general.architecture is not a string".to_string(),
+                ))
+            }
+        };
+
+        match arch_str {
+            "phi3" => Ok(ModelArch::Phi3),
+            "llama" => Ok(ModelArch::Llama),
+            "qwen2" => Ok(ModelArch::Qwen2),
+            "qwen3" => Ok(ModelArch::Qwen3),
+            "gemma3" | "gemma2" => Ok(ModelArch::Gemma3),
+            other => Err(BatataError::Inference(format!(
+                "unsupported GGUF architecture '{other}', supported: phi3, llama, qwen2, qwen3, gemma3"
+            ))),
+        }
+    }
+
+    fn load_backend(
+        arch: ModelArch,
+        content: gguf_file::Content,
+        file: &mut std::fs::File,
+        device: &Device,
+    ) -> Result<ModelBackend> {
+        match arch {
+            ModelArch::Phi3 => {
+                let m = candle_transformers::models::quantized_phi3::ModelWeights::from_gguf(
+                    false, content, file, device,
+                )
+                .map_err(|e| BatataError::Inference(format!("failed to load Phi-3: {e}")))?;
+                Ok(ModelBackend::Phi3(m))
+            }
+            ModelArch::Llama => {
+                let m = candle_transformers::models::quantized_llama::ModelWeights::from_gguf(
+                    content, file, device,
+                )
+                .map_err(|e| BatataError::Inference(format!("failed to load Llama: {e}")))?;
+                Ok(ModelBackend::Llama(m))
+            }
+            ModelArch::Qwen2 => {
+                let m = candle_transformers::models::quantized_qwen2::ModelWeights::from_gguf(
+                    content, file, device,
+                )
+                .map_err(|e| BatataError::Inference(format!("failed to load Qwen2: {e}")))?;
+                Ok(ModelBackend::Qwen2(m))
+            }
+            ModelArch::Qwen3 => {
+                let m = candle_transformers::models::quantized_qwen3::ModelWeights::from_gguf(
+                    content, file, device,
+                )
+                .map_err(|e| BatataError::Inference(format!("failed to load Qwen3: {e}")))?;
+                Ok(ModelBackend::Qwen3(m))
+            }
+            ModelArch::Gemma3 => {
+                let m = candle_transformers::models::quantized_gemma3::ModelWeights::from_gguf(
+                    content, file, device,
+                )
+                .map_err(|e| BatataError::Inference(format!("failed to load Gemma3: {e}")))?;
+                Ok(ModelBackend::Gemma3(m))
+            }
+        }
     }
 
     /// Download model from HuggingFace Hub and load it

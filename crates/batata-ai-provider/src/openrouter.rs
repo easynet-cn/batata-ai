@@ -1,14 +1,15 @@
 use async_trait::async_trait;
-use rig::client::CompletionClient;
-use rig::completion::Prompt;
+use reqwest::header::{HeaderMap, HeaderValue};
 
 use batata_ai_core::{
-    error::{BatataError, Result},
+    error::Result,
     message::{ChatRequest, ChatResponse, ChatStream},
     provider::{Provider, ProviderCapabilities},
 };
 
-// ── Free model constants ─────────────────────────────────────────
+use crate::openai_compat::{self, OpenAiCompatConfig};
+
+// -- Free model constants ─────────────────────────────────────────
 
 pub const GEMMA_3_4B_FREE: &str = "google/gemma-3-4b-it:free";
 pub const GEMMA_3_12B_FREE: &str = "google/gemma-3-12b-it:free";
@@ -33,7 +34,7 @@ pub const STEP_3_5_FLASH_FREE: &str = "stepfun/step-3.5-flash:free";
 pub const GLM_4_5_AIR_FREE: &str = "z-ai/glm-4.5-air:free";
 pub const OPENROUTER_FREE: &str = "openrouter/free";
 
-/// List all available free model IDs on OpenRouter
+/// List all available free model IDs on OpenRouter.
 pub fn free_models() -> Vec<&'static str> {
     vec![
         GEMMA_3_4B_FREE,
@@ -60,25 +61,33 @@ pub fn free_models() -> Vec<&'static str> {
     ]
 }
 
-// ── Provider ─────────────────────────────────────────────────────
+// -- Provider ─────────────────────────────────────────────────────
 
 pub struct OpenRouterProvider {
-    client: rig::providers::openrouter::Client,
-    default_model: String,
+    config: OpenAiCompatConfig,
 }
 
 impl OpenRouterProvider {
-    pub fn new(api_key: impl Into<String>) -> Result<Self> {
-        let client = rig::providers::openrouter::Client::new(&api_key.into())
-            .map_err(|e| BatataError::Provider(e.to_string()))?;
-        Ok(Self {
-            client,
-            default_model: QWEN3_6_PLUS_FREE.to_string(),
-        })
+    pub fn new(api_key: impl Into<String>) -> Self {
+        let mut extra_headers = HeaderMap::new();
+        extra_headers.insert(
+            "HTTP-Referer",
+            HeaderValue::from_static("https://github.com/easynet-cn/batata-ai"),
+        );
+        extra_headers.insert("X-Title", HeaderValue::from_static("batata-ai"));
+
+        Self {
+            config: OpenAiCompatConfig {
+                base_url: "https://openrouter.ai/api/v1".to_string(),
+                api_key: api_key.into(),
+                default_model: QWEN3_6_PLUS_FREE.to_string(),
+                extra_headers,
+            },
+        }
     }
 
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
-        self.default_model = model.into();
+        self.config.default_model = model.into();
         self
     }
 }
@@ -99,31 +108,10 @@ impl Provider for OpenRouterProvider {
     }
 
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {
-        let model = req.model.as_deref().unwrap_or(&self.default_model);
-        let agent = self.client.agent(model).build();
-
-        let last_user_msg = req
-            .messages
-            .iter()
-            .rfind(|m| matches!(m.role, batata_ai_core::message::Role::User))
-            .map(|m| m.content.as_str())
-            .unwrap_or("");
-
-        let response: String = agent
-            .prompt(last_user_msg)
-            .await
-            .map_err(|e| BatataError::Provider(e.to_string()))?;
-
-        Ok(ChatResponse {
-            content: response,
-            model: model.to_string(),
-            usage: None,
-        })
+        openai_compat::chat(&self.config, req).await
     }
 
     async fn stream_chat(&self, req: ChatRequest) -> Result<ChatStream> {
-        let response = self.chat(req).await?;
-        let stream = futures::stream::once(async move { Ok(response.content) });
-        Ok(Box::pin(stream))
+        openai_compat::stream_chat(&self.config, req).await
     }
 }

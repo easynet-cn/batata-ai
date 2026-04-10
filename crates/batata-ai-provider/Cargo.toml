@@ -8,11 +8,17 @@ description = "Provider implementations for batata-ai: OpenAI, Anthropic, Ollama
 
 [features]
 default = ["openai", "ollama", "openrouter"]
-openai = ["dep:rig-core"]
-ollama = ["dep:rig-core"]
-anthropic = ["dep:rig-core"]
-openrouter = ["dep:rig-core"]
-all = ["openai", "ollama", "anthropic", "openrouter"]
+openai = []
+ollama = []
+anthropic = []
+openrouter = []
+deepseek = []
+groq = []
+together = []
+mistral = []
+siliconflow = []
+zhipu = []
+all = ["openai", "ollama", "anthropic", "openrouter", "deepseek", "groq", "together", "mistral", "siliconflow", "zhipu"]
 
 [dependencies]
 batata-ai-core.workspace = true
@@ -23,5 +29,4 @@ thiserror.workspace = true
 tokio.workspace = true
 futures.workspace = true
 tracing.workspace = true
-reqwest.workspace = true
-rig-core = { workspace = true, optional = true }
+reqwest = { workspace = true, features = ["json", "stream"] }

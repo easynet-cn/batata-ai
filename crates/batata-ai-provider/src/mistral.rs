@@ -9,17 +9,45 @@ use batata_ai_core::{
 
 use crate::openai_compat::{self, OpenAiCompatConfig};
 
-pub struct OpenAiProvider {
+// -- Popular model constants ──────────────────────────────────────
+
+pub const MISTRAL_LARGE: &str = "mistral-large-latest";
+pub const MISTRAL_SMALL: &str = "mistral-small-latest";
+pub const MISTRAL_MEDIUM: &str = "mistral-medium-latest";
+pub const CODESTRAL: &str = "codestral-latest";
+pub const MINISTRAL_8B: &str = "ministral-8b-latest";
+pub const MISTRAL_NEMO: &str = "open-mistral-nemo";
+pub const MIXTRAL_8X7B: &str = "open-mixtral-8x7b";
+pub const MIXTRAL_8X22B: &str = "open-mixtral-8x22b";
+pub const PIXTRAL_LARGE: &str = "pixtral-large-latest";
+
+/// List popular models available on Mistral AI.
+pub fn popular_models() -> Vec<&'static str> {
+    vec![
+        MISTRAL_LARGE,
+        MISTRAL_SMALL,
+        CODESTRAL,
+        MINISTRAL_8B,
+        MISTRAL_NEMO,
+        MIXTRAL_8X7B,
+        MIXTRAL_8X22B,
+        PIXTRAL_LARGE,
+    ]
+}
+
+// -- Provider ─────────────────────────────────────────────────────
+
+pub struct MistralProvider {
     config: OpenAiCompatConfig,
 }
 
-impl OpenAiProvider {
+impl MistralProvider {
     pub fn new(api_key: impl Into<String>) -> Self {
         Self {
             config: OpenAiCompatConfig {
-                base_url: "https://api.openai.com/v1".to_string(),
+                base_url: "https://api.mistral.ai/v1".to_string(),
                 api_key: api_key.into(),
-                default_model: "gpt-4o-mini".to_string(),
+                default_model: MISTRAL_SMALL.to_string(),
                 extra_headers: HeaderMap::new(),
             },
         }
@@ -37,9 +65,9 @@ impl OpenAiProvider {
 }
 
 #[async_trait]
-impl Provider for OpenAiProvider {
+impl Provider for MistralProvider {
     fn name(&self) -> &str {
-        "openai"
+        "mistral"
     }
 
     fn capabilities(&self) -> ProviderCapabilities {

@@ -12,6 +12,12 @@ use batata_ai_core::provider::Provider;
 /// - `"anthropic"` — Anthropic API
 /// - `"ollama"` — Ollama local server
 /// - `"openrouter"` — OpenRouter API
+/// - `"deepseek"` — DeepSeek API
+/// - `"groq"` — Groq API (ultra-fast inference)
+/// - `"together"` — Together AI API
+/// - `"mistral"` — Mistral AI API
+/// - `"siliconflow"` — SiliconFlow API (硅基流动)
+/// - `"zhipu"` — Zhipu AI API (智谱AI / GLM)
 pub fn create_provider(def: &ProviderDefinition) -> Result<Arc<dyn Provider>> {
     match def.provider_type.as_str() {
         "local" => create_local_provider(def),
@@ -19,6 +25,12 @@ pub fn create_provider(def: &ProviderDefinition) -> Result<Arc<dyn Provider>> {
         "anthropic" => create_anthropic_provider(def),
         "ollama" => create_ollama_provider(def),
         "openrouter" => create_openrouter_provider(def),
+        "deepseek" => create_deepseek_provider(def),
+        "groq" => create_groq_provider(def),
+        "together" => create_together_provider(def),
+        "mistral" => create_mistral_provider(def),
+        "siliconflow" => create_siliconflow_provider(def),
+        "zhipu" => create_zhipu_provider(def),
         other => Err(BatataError::Provider(format!(
             "unsupported provider type: '{other}'"
         ))),
@@ -82,8 +94,11 @@ fn create_openai_provider(def: &ProviderDefinition) -> Result<Arc<dyn Provider>>
         .as_deref()
         .ok_or_else(|| BatataError::Provider("openai provider requires api_key".into()))?;
 
-    let mut provider = batata_ai_provider::openai::OpenAiProvider::new(api_key)?;
+    let mut provider = batata_ai_provider::openai::OpenAiProvider::new(api_key);
 
+    if let Some(url) = &def.base_url {
+        provider = provider.with_base_url(url);
+    }
     if let Some(model) = def.config.as_ref().and_then(|c| c["default_model"].as_str()) {
         provider = provider.with_model(model);
     }
@@ -97,8 +112,11 @@ fn create_anthropic_provider(def: &ProviderDefinition) -> Result<Arc<dyn Provide
         .as_deref()
         .ok_or_else(|| BatataError::Provider("anthropic provider requires api_key".into()))?;
 
-    let mut provider = batata_ai_provider::anthropic::AnthropicProvider::new(api_key)?;
+    let mut provider = batata_ai_provider::anthropic::AnthropicProvider::new(api_key);
 
+    if let Some(url) = &def.base_url {
+        provider = provider.with_base_url(url);
+    }
     if let Some(model) = def.config.as_ref().and_then(|c| c["default_model"].as_str()) {
         provider = provider.with_model(model);
     }
@@ -126,8 +144,116 @@ fn create_openrouter_provider(def: &ProviderDefinition) -> Result<Arc<dyn Provid
         .as_deref()
         .ok_or_else(|| BatataError::Provider("openrouter provider requires api_key".into()))?;
 
-    let mut provider = batata_ai_provider::openrouter::OpenRouterProvider::new(api_key)?;
+    let mut provider = batata_ai_provider::openrouter::OpenRouterProvider::new(api_key);
 
+    if let Some(model) = def.config.as_ref().and_then(|c| c["default_model"].as_str()) {
+        provider = provider.with_model(model);
+    }
+
+    Ok(Arc::new(provider))
+}
+
+fn create_deepseek_provider(def: &ProviderDefinition) -> Result<Arc<dyn Provider>> {
+    let api_key = def
+        .api_key
+        .as_deref()
+        .ok_or_else(|| BatataError::Provider("deepseek provider requires api_key".into()))?;
+
+    let mut provider = batata_ai_provider::deepseek::DeepSeekProvider::new(api_key);
+
+    if let Some(url) = &def.base_url {
+        provider = provider.with_base_url(url);
+    }
+    if let Some(model) = def.config.as_ref().and_then(|c| c["default_model"].as_str()) {
+        provider = provider.with_model(model);
+    }
+
+    Ok(Arc::new(provider))
+}
+
+fn create_groq_provider(def: &ProviderDefinition) -> Result<Arc<dyn Provider>> {
+    let api_key = def
+        .api_key
+        .as_deref()
+        .ok_or_else(|| BatataError::Provider("groq provider requires api_key".into()))?;
+
+    let mut provider = batata_ai_provider::groq::GroqProvider::new(api_key);
+
+    if let Some(url) = &def.base_url {
+        provider = provider.with_base_url(url);
+    }
+    if let Some(model) = def.config.as_ref().and_then(|c| c["default_model"].as_str()) {
+        provider = provider.with_model(model);
+    }
+
+    Ok(Arc::new(provider))
+}
+
+fn create_together_provider(def: &ProviderDefinition) -> Result<Arc<dyn Provider>> {
+    let api_key = def
+        .api_key
+        .as_deref()
+        .ok_or_else(|| BatataError::Provider("together provider requires api_key".into()))?;
+
+    let mut provider = batata_ai_provider::together::TogetherProvider::new(api_key);
+
+    if let Some(url) = &def.base_url {
+        provider = provider.with_base_url(url);
+    }
+    if let Some(model) = def.config.as_ref().and_then(|c| c["default_model"].as_str()) {
+        provider = provider.with_model(model);
+    }
+
+    Ok(Arc::new(provider))
+}
+
+fn create_mistral_provider(def: &ProviderDefinition) -> Result<Arc<dyn Provider>> {
+    let api_key = def
+        .api_key
+        .as_deref()
+        .ok_or_else(|| BatataError::Provider("mistral provider requires api_key".into()))?;
+
+    let mut provider = batata_ai_provider::mistral::MistralProvider::new(api_key);
+
+    if let Some(url) = &def.base_url {
+        provider = provider.with_base_url(url);
+    }
+    if let Some(model) = def.config.as_ref().and_then(|c| c["default_model"].as_str()) {
+        provider = provider.with_model(model);
+    }
+
+    Ok(Arc::new(provider))
+}
+
+fn create_siliconflow_provider(def: &ProviderDefinition) -> Result<Arc<dyn Provider>> {
+    let api_key = def
+        .api_key
+        .as_deref()
+        .ok_or_else(|| BatataError::Provider("siliconflow provider requires api_key".into()))?;
+
+    let mut provider = batata_ai_provider::siliconflow::SiliconFlowProvider::new(api_key);
+
+    if let Some(url) = &def.base_url {
+        provider = provider.with_base_url(url);
+    }
+    if let Some(model) = def.config.as_ref().and_then(|c| c["default_model"].as_str()) {
+        provider = provider.with_model(model);
+    }
+
+    Ok(Arc::new(provider))
+}
+
+fn create_zhipu_provider(def: &ProviderDefinition) -> Result<Arc<dyn Provider>> {
+    let api_key = def
+        .api_key
+        .as_deref()
+        .ok_or_else(|| BatataError::Provider("zhipu provider requires api_key".into()))?;
+
+    let mut provider = batata_ai_provider::zhipu::ZhipuProvider::new(api_key);
+
+    if let Some(url) = &def.base_url {
+        provider = provider.with_base_url(url);
+    }
     if let Some(model) = def.config.as_ref().and_then(|c| c["default_model"].as_str()) {
         provider = provider.with_model(model);
     }

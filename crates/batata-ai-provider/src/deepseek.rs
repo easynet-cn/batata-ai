@@ -9,17 +9,17 @@ use batata_ai_core::{
 
 use crate::openai_compat::{self, OpenAiCompatConfig};
 
-pub struct OpenAiProvider {
+pub struct DeepSeekProvider {
     config: OpenAiCompatConfig,
 }
 
-impl OpenAiProvider {
+impl DeepSeekProvider {
     pub fn new(api_key: impl Into<String>) -> Self {
         Self {
             config: OpenAiCompatConfig {
-                base_url: "https://api.openai.com/v1".to_string(),
+                base_url: "https://api.deepseek.com/v1".to_string(),
                 api_key: api_key.into(),
-                default_model: "gpt-4o-mini".to_string(),
+                default_model: "deepseek-chat".to_string(),
                 extra_headers: HeaderMap::new(),
             },
         }
@@ -37,16 +37,16 @@ impl OpenAiProvider {
 }
 
 #[async_trait]
-impl Provider for OpenAiProvider {
+impl Provider for DeepSeekProvider {
     fn name(&self) -> &str {
-        "openai"
+        "deepseek"
     }
 
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
             chat: true,
             streaming: true,
-            embeddings: true,
+            embeddings: false,
             function_calling: true,
         }
     }

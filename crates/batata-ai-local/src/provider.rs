@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
@@ -13,7 +13,8 @@ use batata_ai_core::{
 
 use crate::inference::GenerationParams;
 use crate::model::resolve_device;
-use crate::models::{LocalModel, ModelDescriptor};
+use crate::model_pool::ModelPool;
+use crate::models::ModelDescriptor;
 
 /// Model source: either download from HuggingFace Hub or load from local files.
 enum ModelSource {
@@ -28,55 +29,65 @@ enum ModelSource {
 }
 
 /// Local inference provider backed by candle.
-/// Supports Phi-3, Llama-3, Qwen2, and Qwen3 via GGUF quantized format.
+///
+/// Uses a `ModelPool` for multi-model concurrent loading with LRU eviction.
+/// Supports Phi-3, Llama-3, Qwen2, Qwen3, and Gemma3 via GGUF quantized format.
 pub struct LocalProvider {
-    model: Arc<Mutex<Option<LocalModel>>>,
+    pool: Arc<ModelPool>,
     source: ModelSource,
-    use_gpu: bool,
     generation_params: GenerationParams,
 }
 
 impl LocalProvider {
     /// Create a new local provider that auto-downloads from HuggingFace Hub.
     ///
-    /// Available models: `"phi3"`, `"llama3"`, `"qwen2"`, `"qwen3"`
-    ///
-    /// First call will download the model (~1-5 GB) and cache it in `~/.cache/huggingface/`.
+    /// Uses a pool with capacity 1 (single model). Use `with_pool` to share a pool.
     pub fn new(model_name: impl Into<String>) -> Self {
+        let device = resolve_device(false).unwrap_or(candle_core::Device::Cpu);
         Self {
-            model: Arc::new(Mutex::new(None)),
+            pool: Arc::new(ModelPool::new(1, device)),
             source: ModelSource::Hub {
                 model_name: model_name.into(),
             },
-            use_gpu: false,
             generation_params: GenerationParams::default(),
         }
     }
 
     /// Create a new local provider from local model files (no download needed).
-    ///
-    /// - `model_name`: one of `"phi3"`, `"llama3"`, `"qwen2"`, `"qwen3"` (determines architecture)
-    /// - `model_path`: path to the `.gguf` model file
-    /// - `tokenizer_path`: path to the `tokenizer.json` file
     pub fn from_local(
         model_name: impl Into<String>,
         model_path: impl Into<PathBuf>,
         tokenizer_path: impl Into<PathBuf>,
     ) -> Self {
+        let device = resolve_device(false).unwrap_or(candle_core::Device::Cpu);
         Self {
-            model: Arc::new(Mutex::new(None)),
+            pool: Arc::new(ModelPool::new(1, device)),
             source: ModelSource::Local {
                 model_name: model_name.into(),
                 model_path: model_path.into(),
                 tokenizer_path: tokenizer_path.into(),
             },
-            use_gpu: false,
             generation_params: GenerationParams::default(),
         }
     }
 
-    pub fn with_gpu(mut self, use_gpu: bool) -> Self {
-        self.use_gpu = use_gpu;
+    pub fn with_gpu(self, use_gpu: bool) -> Self {
+        let device = resolve_device(use_gpu).unwrap_or(candle_core::Device::Cpu);
+        Self {
+            pool: Arc::new(ModelPool::new(
+                self.pool.loaded_count().max(1),
+                device,
+            )),
+            ..self
+        }
+    }
+
+    /// Use a shared `ModelPool` (for multi-model scenarios).
+    ///
+    /// This allows multiple `LocalProvider` instances to share the same pool,
+    /// enabling concurrent loading of different models with LRU eviction.
+    pub fn with_pool(mut self, pool: Arc<ModelPool>) -> Self {
+        self.pool = pool;
         self
     }
 
@@ -90,51 +101,16 @@ impl LocalProvider {
         ModelDescriptor::available_models()
     }
 
-    fn model_display_name(&self) -> &str {
+    /// Get the underlying model pool (for sharing with other providers).
+    pub fn pool(&self) -> &Arc<ModelPool> {
+        &self.pool
+    }
+
+    fn model_name(&self) -> &str {
         match &self.source {
             ModelSource::Hub { model_name } => model_name,
             ModelSource::Local { model_name, .. } => model_name,
         }
-    }
-
-    /// Ensure the model is loaded
-    fn ensure_loaded(&self) -> Result<()> {
-        let mut guard = self.model.lock().map_err(|e| {
-            BatataError::Inference(format!("failed to lock model: {e}"))
-        })?;
-
-        if guard.is_none() {
-            let device = resolve_device(self.use_gpu)?;
-            let loaded = match &self.source {
-                ModelSource::Hub { model_name } => {
-                    let descriptor =
-                        ModelDescriptor::by_name(model_name).ok_or_else(|| {
-                            BatataError::ModelNotFound(format!(
-                                "unknown model '{model_name}', available: {:?}",
-                                ModelDescriptor::available_models()
-                            ))
-                        })?;
-                    LocalModel::download_and_load(descriptor, &device)?
-                }
-                ModelSource::Local {
-                    model_name,
-                    model_path,
-                    tokenizer_path,
-                } => {
-                    let descriptor =
-                        ModelDescriptor::by_name(model_name).ok_or_else(|| {
-                            BatataError::ModelNotFound(format!(
-                                "unknown model architecture '{model_name}', available: {:?}",
-                                ModelDescriptor::available_models()
-                            ))
-                        })?;
-                    LocalModel::load(descriptor, model_path, tokenizer_path, &device)?
-                }
-            };
-            *guard = Some(loaded);
-        }
-
-        Ok(())
     }
 
     fn build_messages(req: &ChatRequest) -> Vec<(String, String)> {
@@ -180,61 +156,72 @@ impl Provider for LocalProvider {
     }
 
     async fn chat(&self, req: ChatRequest) -> Result<ChatResponse> {
-        self.ensure_loaded()?;
-
         let messages = Self::build_messages(&req);
         let params = self.build_params(&req);
+        let model_name = self.model_name().to_string();
 
-        let content = {
-            let mut guard = self.model.lock().map_err(|e| {
-                BatataError::Inference(format!("failed to lock model: {e}"))
-            })?;
-            let model = guard.as_mut().ok_or_else(|| {
-                BatataError::Inference("model not loaded".to_string())
-            })?;
-            model.chat(&messages, &params)?
+        let content = match &self.source {
+            ModelSource::Hub { model_name } => {
+                let name = model_name.clone();
+                self.pool
+                    .with_model(&name, |model| model.chat(&messages, &params))?
+            }
+            ModelSource::Local {
+                model_name,
+                model_path,
+                tokenizer_path,
+            } => self.pool.load_local(
+                model_name,
+                model_path,
+                tokenizer_path,
+                |model| model.chat(&messages, &params),
+            )?,
         };
 
         Ok(ChatResponse {
             content,
-            model: self.model_display_name().to_string(),
+            model: model_name,
             usage: None,
         })
     }
 
     async fn stream_chat(&self, req: ChatRequest) -> Result<ChatStream> {
-        self.ensure_loaded()?;
-
         let messages = Self::build_messages(&req);
         let params = self.build_params(&req);
-        let model = Arc::clone(&self.model);
+        let pool = Arc::clone(&self.pool);
+        let model_name = self.model_name().to_string();
+        let source_is_hub = matches!(&self.source, ModelSource::Hub { .. });
+        let model_path = match &self.source {
+            ModelSource::Local {
+                model_path,
+                tokenizer_path,
+                ..
+            } => Some((model_path.clone(), tokenizer_path.clone())),
+            _ => None,
+        };
 
         let (tx, rx) = mpsc::channel::<Result<String>>(32);
 
         tokio::task::spawn_blocking(move || {
-            let mut guard = match model.lock() {
-                Ok(g) => g,
-                Err(e) => {
-                    let _ = tx.blocking_send(Err(BatataError::Inference(format!(
-                        "failed to lock model: {e}"
-                    ))));
-                    return;
-                }
+            let result = if source_is_hub {
+                pool.with_model(&model_name, |model| {
+                    model.chat_stream(&messages, &params, |token_text| {
+                        let _ = tx.blocking_send(Ok(token_text.to_string()));
+                    })
+                })
+            } else if let Some((mp, tp)) = &model_path {
+                pool.load_local(&model_name, mp, tp, |model| {
+                    model.chat_stream(&messages, &params, |token_text| {
+                        let _ = tx.blocking_send(Ok(token_text.to_string()));
+                    })
+                })
+            } else {
+                Err(BatataError::Inference("invalid model source".to_string()))
             };
 
-            let model = match guard.as_mut() {
-                Some(m) => m,
-                None => {
-                    let _ = tx.blocking_send(Err(BatataError::Inference(
-                        "model not loaded".to_string(),
-                    )));
-                    return;
-                }
-            };
-
-            let _ = model.chat_stream(&messages, &params, |token_text| {
-                let _ = tx.blocking_send(Ok(token_text.to_string()));
-            });
+            if let Err(e) = result {
+                let _ = tx.blocking_send(Err(e));
+            }
         });
 
         let stream = ReceiverStream::new(rx);

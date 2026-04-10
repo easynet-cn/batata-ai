@@ -10,5 +10,6 @@ description = "Prompt template engine for batata-ai"
 batata-ai-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tera.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
