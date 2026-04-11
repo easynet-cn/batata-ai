@@ -9,4 +9,5 @@ pub mod model_pool;
 pub mod models;
 pub mod phi3;
 pub mod provider;
+pub mod stable_diffusion;
 pub mod whisper;

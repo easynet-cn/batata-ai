@@ -72,6 +72,9 @@ hf-hub = "0.4"
 # Tokenizer
 tokenizers = "0.22"
 
+# Image I/O (PNG encode/decode for stable diffusion etc.)
+image = { version = "0.25", default-features = false, features = ["png"] }
+
 # Stream utilities
 tokio-stream = "0.1"
 
