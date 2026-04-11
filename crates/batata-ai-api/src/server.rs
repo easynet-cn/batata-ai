@@ -48,6 +48,17 @@ pub async fn start(state: AppState, bind: &str) -> std::io::Result<()> {
             .service(handler::model::list_models)
             // Chat
             .service(handler::chat::chat_completions)
+            // RAG: KB CRUD
+            .service(handler::rag::create_kb)
+            .service(handler::rag::list_kbs)
+            .service(handler::rag::get_kb)
+            .service(handler::rag::delete_kb)
+            // RAG: documents
+            .service(handler::rag::ingest_document)
+            .service(handler::rag::upload_document)
+            .service(handler::rag::list_documents)
+            .service(handler::rag::delete_document)
+            .service(handler::rag::search_kb)
             // Usage
             .service(handler::usage::get_usage)
             // Conversations

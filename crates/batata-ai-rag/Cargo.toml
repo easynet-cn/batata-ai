@@ -1,0 +1,30 @@
+[package]
+name = "batata-ai-rag"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Retrieval-Augmented Generation primitives for batata-ai"
+
+[dependencies]
+batata-ai-core.workspace = true
+batata-ai-local.workspace = true
+batata-ai-storage.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["sync", "rt"] }
+tracing.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+candle-core.workspace = true
+sea-orm = { version = "1", features = ["runtime-tokio-rustls"] }
+
+# Document loaders — pure-Rust parsers only, no system dependencies.
+pdf-extract = "0.10"
+html2text = "0.16"
+pulldown-cmark = { version = "0.13", default-features = false }
+instant-distance = "0.6"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

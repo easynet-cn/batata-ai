@@ -9,6 +9,7 @@ pub mod message;
 pub mod multimodal;
 pub mod object_store;
 pub mod provider;
+pub mod rag;
 pub mod repository;
 pub mod routing;
 pub mod skill;

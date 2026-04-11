@@ -78,6 +78,11 @@ async fn main() -> anyhow::Result<()> {
         log_repo: Arc::new(SeaOrmRequestLogRepository::new(db.clone())),
         cache: Some(cache),
         cache_key_strategy: Arc::new(DefaultCacheKeyStrategy),
+        rag_pipeline: None,
+        kb_repo: None,
+        kb_document_repo: None,
+        rag_object_store: None,
+        rag_upload_prefix: "rag-uploads".to_string(),
     };
 
     // Start server

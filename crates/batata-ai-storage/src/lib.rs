@@ -9,11 +9,11 @@ use tracing;
 
 pub use repo::{
     SeaOrmApiKeyRepository, SeaOrmConversationMessageRepository, SeaOrmConversationRepository,
-    SeaOrmModelCostRepository, SeaOrmModelRepository, SeaOrmObjectStoreBucketRepository,
-    SeaOrmObjectStoreConfigRepository, SeaOrmPromptRepository, SeaOrmProviderRepository,
-    SeaOrmRequestLogRepository, SeaOrmRoutingPolicyRepository, SeaOrmSkillRepository,
-    SeaOrmStoredObjectRepository, SeaOrmTenantRepository, SeaOrmTenantUsageRepository,
-    SeaOrmUserRepository,
+    SeaOrmKbDocumentRepository, SeaOrmKnowledgeBaseRepository, SeaOrmModelCostRepository,
+    SeaOrmModelRepository, SeaOrmObjectStoreBucketRepository, SeaOrmObjectStoreConfigRepository,
+    SeaOrmPromptRepository, SeaOrmProviderRepository, SeaOrmRequestLogRepository,
+    SeaOrmRoutingPolicyRepository, SeaOrmSkillRepository, SeaOrmStoredObjectRepository,
+    SeaOrmTenantRepository, SeaOrmTenantUsageRepository, SeaOrmUserRepository, SeaOrmVectorStore,
 };
 
 /// Connect to database and run pending migrations.

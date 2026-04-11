@@ -1,4 +1,7 @@
+pub mod bge;
+pub mod bge_m3;
 pub mod blip;
+pub mod reranker;
 pub mod clip;
 pub mod inference;
 pub mod model;

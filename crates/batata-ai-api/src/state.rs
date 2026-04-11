@@ -4,11 +4,14 @@ use sea_orm::DatabaseConnection;
 use tokio::sync::RwLock;
 
 use batata_ai_core::cache::{CacheKeyStrategy, CacheStore};
+use batata_ai_core::object_store::ObjectStore;
+use batata_ai_core::rag::{KbDocumentRepository, KnowledgeBaseRepository};
 use batata_ai_core::repository::{
     ApiKeyRepository, ConversationMessageRepository, ConversationRepository, ModelRepository,
     PromptRepository, ProviderRepository, RequestLogRepository, TenantRepository, UserRepository,
 };
 use crate::middleware::RateLimiter;
+use batata_ai_rag::IngestPipeline;
 use batata_ai_router::Router;
 
 /// Shared application state injected into all handlers.
@@ -28,4 +31,15 @@ pub struct AppState {
     pub log_repo: Arc<dyn RequestLogRepository>,
     pub cache: Option<Arc<dyn CacheStore>>,
     pub cache_key_strategy: Arc<dyn CacheKeyStrategy>,
+    /// RAG pipeline — None when RAG is disabled in the build/config.
+    pub rag_pipeline: Option<Arc<IngestPipeline>>,
+    pub kb_repo: Option<Arc<dyn KnowledgeBaseRepository>>,
+    pub kb_document_repo: Option<Arc<dyn KbDocumentRepository>>,
+    /// Optional object storage backend for uploaded RAG documents.
+    /// When present, `POST /v1/kb/{id}/documents/upload` persists the
+    /// raw bytes and stamps the document's `source_uri` with the key.
+    pub rag_object_store: Option<Arc<dyn ObjectStore>>,
+    /// Bucket / prefix used when persisting RAG uploads. Typically the
+    /// store's default bucket name.
+    pub rag_upload_prefix: String,
 }

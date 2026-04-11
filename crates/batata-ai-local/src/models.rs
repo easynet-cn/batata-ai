@@ -86,7 +86,7 @@ impl ModelDescriptor {
             name: "llama-3-8b".into(),
             repo_id: "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF".into(),
             filenames: vec!["Meta-Llama-3-8B-Instruct.Q4_K_M.gguf".into()],
-            tokenizer_repo: "meta-llama/Meta-Llama-3-8B-Instruct".into(),
+            tokenizer_repo: "NousResearch/Meta-Llama-3-8B-Instruct".into(),
             chat_template: ChatTemplate::Llama3,
             eos_tokens: vec![
                 "<|eot_id|>".into(),
@@ -107,13 +107,16 @@ impl ModelDescriptor {
         }
     }
 
-    /// Qwen3-1.7B (native candle Qwen3 loader)
+    /// Qwen3-1.7B (native candle Qwen3 loader).
+    ///
+    /// Note: The official `Qwen/Qwen3-1.7B-GGUF` repo only ships the Q8_0
+    /// quantization, so this descriptor uses Q8_0 (≈1.8 GB).
     pub fn qwen3_1_7b_q4() -> Self {
         Self {
             arch: ModelArch::Qwen3,
             name: "qwen3-1.7b".into(),
             repo_id: "Qwen/Qwen3-1.7B-GGUF".into(),
-            filenames: vec!["qwen3-1.7b-q4_k_m.gguf".into()],
+            filenames: vec!["Qwen3-1.7B-Q8_0.gguf".into()],
             tokenizer_repo: "Qwen/Qwen3-1.7B".into(),
             chat_template: ChatTemplate::ChatML,
             eos_tokens: vec!["<|im_end|>".into(), "<|endoftext|>".into()],
@@ -125,7 +128,7 @@ impl ModelDescriptor {
             arch: ModelArch::Qwen3,
             name: "qwen3-4b".into(),
             repo_id: "Qwen/Qwen3-4B-GGUF".into(),
-            filenames: vec!["qwen3-4b-q4_k_m.gguf".into()],
+            filenames: vec!["Qwen3-4B-Q4_K_M.gguf".into()],
             tokenizer_repo: "Qwen/Qwen3-4B".into(),
             chat_template: ChatTemplate::ChatML,
             eos_tokens: vec!["<|im_end|>".into(), "<|endoftext|>".into()],
@@ -636,9 +639,46 @@ pub fn download_model(
     Ok((model_path, tokenizer_path))
 }
 
+/// Resolve the base directory used to store downloaded models.
+///
+/// Resolution order:
+/// 1. `BATATA_AI_MODELS_DIR` environment variable, if set.
+/// 2. `$HOME/work/models` (default layout for this project).
+/// 3. `./models` as a last-resort fallback when `$HOME` is not available.
+pub fn default_models_dir() -> std::path::PathBuf {
+    if let Ok(dir) = std::env::var("BATATA_AI_MODELS_DIR") {
+        return std::path::PathBuf::from(dir);
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        return std::path::PathBuf::from(home).join("work").join("models");
+    }
+    std::path::PathBuf::from("./models")
+}
+
+/// Resolve the on-disk directory for a specific model name, based on
+/// [`default_models_dir`]. The layout is `<base>/<model_name>/`.
+pub fn resolve_model_dir(model_name: &str) -> std::path::PathBuf {
+    default_models_dir().join(model_name)
+}
+
+/// Download a model by name into its resolved directory under
+/// [`default_models_dir`]. Equivalent to
+/// `download_model_to(model_name, &default_models_dir(), true)`.
+pub fn download_model_default(
+    model_name: &str,
+) -> Result<(std::path::PathBuf, std::path::PathBuf)> {
+    download_model_to(model_name, &default_models_dir(), true)
+}
+
 /// Download a model by name and copy files to a target directory.
 ///
 /// Returns `(model_path, tokenizer_path)` in the target directory.
+///
+/// When `nest_by_model` is `true`, files are placed under
+/// `target_dir/<model_name>/` so that multiple models can coexist inside the
+/// same base directory. When `false`, files are placed directly in
+/// `target_dir` (legacy behavior, kept for callers that already manage the
+/// layout themselves).
 ///
 /// This is useful for:
 /// - Offline deployment (pre-download, then use `LocalProvider::from_local`)
@@ -647,6 +687,7 @@ pub fn download_model(
 pub fn download_model_to(
     model_name: &str,
     target_dir: &std::path::Path,
+    nest_by_model: bool,
 ) -> Result<(std::path::PathBuf, std::path::PathBuf)> {
     let descriptor = ModelDescriptor::by_name(model_name).ok_or_else(|| {
         BatataError::ModelNotFound(format!(
@@ -658,19 +699,26 @@ pub fn download_model_to(
     // Download to HF cache first
     let (cached_model, cached_tokenizer) = download_model(&descriptor)?;
 
+    // Resolve final directory: nest under <target_dir>/<model_name>/ when asked
+    let final_dir: std::path::PathBuf = if nest_by_model {
+        target_dir.join(&descriptor.name)
+    } else {
+        target_dir.to_path_buf()
+    };
+
     // Ensure target directory exists
-    std::fs::create_dir_all(target_dir)?;
+    std::fs::create_dir_all(&final_dir)?;
 
     // Copy model file
     let model_filename = &descriptor.filenames[0];
-    let target_model = target_dir.join(model_filename);
+    let target_model = final_dir.join(model_filename);
     if !target_model.exists() {
         info!("copying model to {}", target_model.display());
         std::fs::copy(&cached_model, &target_model)?;
     }
 
     // Copy tokenizer
-    let target_tokenizer = target_dir.join("tokenizer.json");
+    let target_tokenizer = final_dir.join("tokenizer.json");
     if !target_tokenizer.exists() {
         info!("copying tokenizer to {}", target_tokenizer.display());
         std::fs::copy(&cached_tokenizer, &target_tokenizer)?;
@@ -678,7 +726,7 @@ pub fn download_model_to(
 
     info!(
         "model files ready in {}",
-        target_dir.display()
+        final_dir.display()
     );
     Ok((target_model, target_tokenizer))
 }

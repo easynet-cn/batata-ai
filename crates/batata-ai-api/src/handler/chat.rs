@@ -17,6 +17,32 @@ pub struct ChatCompletionRequest {
     pub stream: Option<bool>,
     /// Optional conversation_id to append messages to.
     pub conversation_id: Option<String>,
+    /// Knowledge base to retrieve context from before answering.
+    pub knowledge_base_id: Option<String>,
+    /// Per-request RAG retrieval tuning.
+    #[serde(default)]
+    pub rag: Option<RagOptions>,
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+pub struct RagOptions {
+    #[serde(default = "default_rag_top_k")]
+    pub top_k: usize,
+    #[serde(default)]
+    pub min_score: Option<f32>,
+}
+
+impl Default for RagOptions {
+    fn default() -> Self {
+        Self {
+            top_k: default_rag_top_k(),
+            min_score: None,
+        }
+    }
+}
+
+fn default_rag_top_k() -> usize {
+    5
 }
 
 #[derive(serde::Deserialize)]
@@ -37,7 +63,7 @@ pub async fn chat_completions(
         .map(|a| a.tenant_id.clone())
         .unwrap_or_default();
 
-    let messages: Vec<Message> = body
+    let mut messages: Vec<Message> = body
         .messages
         .iter()
         .map(|m| {
@@ -54,6 +80,61 @@ pub async fn chat_completions(
             }
         })
         .collect();
+
+    // --- RAG context injection (before cache lookup so the key captures it) ---
+    if let (Some(kb_id), Some(pipeline)) =
+        (body.knowledge_base_id.as_ref(), state.rag_pipeline.clone())
+    {
+        let opts = body.rag.clone().unwrap_or_default();
+        // Use the *last user message* as the retrieval query.
+        let user_query = messages
+            .iter()
+            .rev()
+            .find(|m| matches!(m.role, batata_ai_core::message::Role::User))
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+
+        if !user_query.is_empty() {
+            match pipeline.search(kb_id, &user_query, opts.top_k).await {
+                Ok(hits) => {
+                    let filtered: Vec<_> = hits
+                        .into_iter()
+                        .filter(|h| opts.min_score.map_or(true, |m| h.score >= m))
+                        .collect();
+                    if !filtered.is_empty() {
+                        let ctx = filtered
+                            .iter()
+                            .enumerate()
+                            .map(|(i, h)| format!("[{}] {}", i + 1, h.chunk.text))
+                            .collect::<Vec<_>>()
+                            .join("\n\n");
+                        let preamble = format!(
+                            "You are given the following retrieved context from knowledge base \
+                             '{kb_id}'. Use it to answer the user's question. If the context is \
+                             not relevant, answer from your own knowledge and say so briefly.\n\n\
+                             --- Context ---\n{ctx}\n--- End Context ---"
+                        );
+                        messages.insert(
+                            0,
+                            Message {
+                                role: batata_ai_core::message::Role::System,
+                                content: preamble,
+                                name: None,
+                            },
+                        );
+                        tracing::debug!(
+                            kb_id,
+                            hits = filtered.len(),
+                            "RAG context injected into chat request"
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(kb_id, error = %e, "RAG search failed, continuing without context");
+                }
+            }
+        }
+    }
 
     let request = ChatRequest {
         messages,

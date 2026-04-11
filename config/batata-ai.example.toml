@@ -1,0 +1,39 @@
+# batata-ai server configuration (example).
+#
+# Pass with: batata-ai-server --config config/batata-ai.toml
+# Or set the env var: BATATA_AI_CONFIG=/path/to/config.toml
+#
+# Every field has a sane default — you only need to uncomment what you want
+# to change. Environment variables override the values below at startup.
+
+# ----------------------------- RAG subsystem -----------------------------
+#
+# RAG is disabled by default: the server still starts without the CLIP
+# model loaded, and `/v1/kb/*` endpoints return 503. Set `enabled = true`
+# (or `BATATA_AI_RAG_ENABLED=1`) to flip it on.
+
+[rag]
+enabled = false
+
+# Embedding backend. Valid values: "clip" (M1+). More backends land in M4.
+embedder = "clip"
+
+# Compute device: "cpu" or "gpu". `gpu` auto-falls-back to CPU if CUDA/Metal
+# is unavailable.
+device = "cpu"
+
+[rag.chunker]
+# Character-window chunker parameters. Window MUST exceed overlap.
+window = 512
+overlap = 64
+
+# --------------------------- Local inference ---------------------------
+# [local]
+# models_dir = "~/work/models"
+# default_model = "qwen3-1.7b"
+# use_gpu = false
+
+# --------------------------- MCP server ---------------------------------
+# [mcp]
+# enabled = false
+# port = 3000

@@ -12,12 +12,14 @@ batata-ai-local.workspace = true
 batata-ai-provider = { workspace = true, features = ["all"] }
 batata-ai-storage.workspace = true
 batata-ai-router.workspace = true
+batata-ai-rag.workspace = true
 
 # Web framework
 actix-web = "4"
 actix-rt = "2"
 actix-cors = "0.7"
 actix-web-lab = "0.24"
+actix-multipart = "0.7"
 
 # Async
 async-trait.workspace = true

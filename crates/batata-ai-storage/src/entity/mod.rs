@@ -1,6 +1,9 @@
 pub mod api_key;
 pub mod conversation;
 pub mod conversation_message;
+pub mod kb_chunk;
+pub mod kb_document;
+pub mod knowledge_base;
 pub mod model;
 pub mod model_cost;
 pub mod model_provider;

@@ -20,3 +20,4 @@ dirs = "6"
 aes-gcm = "0.10"
 base64 = "0.22"
 hex = "0.4"
+toml = { workspace = true }

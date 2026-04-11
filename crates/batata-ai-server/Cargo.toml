@@ -16,6 +16,8 @@ batata-ai-storage.workspace = true
 batata-ai-router.workspace = true
 batata-ai-api.workspace = true
 batata-ai-local.workspace = true
+batata-ai-rag.workspace = true
+batata-ai-object-store.workspace = true
 batata-ai-provider = { workspace = true, features = ["all"] }
 tokio.workspace = true
 tracing.workspace = true

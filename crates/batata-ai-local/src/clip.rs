@@ -30,8 +30,10 @@ impl ClipModel {
             .map_err(|e| BatataError::Inference(e.to_string()))?;
         let repo = api.model(repo_id.to_string());
 
+        // Note: `openai/clip-vit-base-patch32` only publishes weights as
+        // `pytorch_model.bin` (no safetensors). We load via `from_pth`.
         let model_path = repo
-            .get("model.safetensors")
+            .get("pytorch_model.bin")
             .map_err(|e| BatataError::Inference(format!("model download failed: {e}")))?;
         let tokenizer_path = repo
             .get("tokenizer.json")
@@ -40,16 +42,34 @@ impl ClipModel {
         Self::load(&model_path, &tokenizer_path, device)
     }
 
-    /// Load from local files
+    /// Load from local files.
+    ///
+    /// `model_path` may point to either a `.safetensors` or a PyTorch
+    /// `.bin` file — the loader is selected based on the file extension.
     pub fn load(model_path: &Path, tokenizer_path: &Path, device: &Device) -> Result<Self> {
         info!("loading CLIP model from {}", model_path.display());
 
         let config = clip::ClipConfig::vit_base_patch32();
         let embed_dim = config.text_config.embed_dim;
 
-        let vb = unsafe {
-            VarBuilder::from_mmaped_safetensors(&[model_path.to_path_buf()], DType::F32, device)
+        let is_pth = model_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|e| matches!(e, "bin" | "pth" | "pt"))
+            .unwrap_or(false);
+
+        let vb = if is_pth {
+            VarBuilder::from_pth(model_path, DType::F32, device)
                 .map_err(|e| BatataError::Inference(format!("failed to load weights: {e}")))?
+        } else {
+            unsafe {
+                VarBuilder::from_mmaped_safetensors(
+                    &[model_path.to_path_buf()],
+                    DType::F32,
+                    device,
+                )
+                .map_err(|e| BatataError::Inference(format!("failed to load weights: {e}")))?
+            }
         };
 
         let model = clip::ClipModel::new(vb, &config)

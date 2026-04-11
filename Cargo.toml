@@ -11,6 +11,7 @@ members = [
     "crates/batata-ai-object-store",
     "crates/batata-ai-api",
     "crates/batata-ai-server",
+    "crates/batata-ai-rag",
 ]
 
 [workspace.package]
@@ -30,6 +31,7 @@ batata-ai-storage = { path = "crates/batata-ai-storage" }
 batata-ai-router = { path = "crates/batata-ai-router" }
 batata-ai-object-store = { path = "crates/batata-ai-object-store" }
 batata-ai-api = { path = "crates/batata-ai-api" }
+batata-ai-rag = { path = "crates/batata-ai-rag" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -87,6 +89,7 @@ schemars = "1"
 # Utils
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
+toml = "0.8"
 
 [package]
 name = "batata-ai"
@@ -104,6 +107,7 @@ batata-ai-prompt.workspace = true
 batata-ai-local.workspace = true
 batata-ai-storage.workspace = true
 batata-ai-router.workspace = true
+batata-ai-rag.workspace = true
 batata-ai-api.workspace = true
 tokio.workspace = true
 anyhow.workspace = true
@@ -114,6 +118,7 @@ sea-orm-adapter = { workspace = true, features = ["sqlite", "runtime-tokio-rustl
 
 [dev-dependencies]
 futures.workspace = true
+hf-hub.workspace = true
 
 [[example]]
 name = "local_chat"
@@ -132,6 +137,12 @@ name = "clip_embed"
 
 [[example]]
 name = "download_model"
+
+[[example]]
+name = "download_multimodal"
+
+[[example]]
+name = "rag_config_smoke"
 
 [[example]]
 name = "mcp_http_server"

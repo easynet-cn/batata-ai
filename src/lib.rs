@@ -3,6 +3,7 @@ pub use batata_ai_local as local;
 pub use batata_ai_mcp as mcp;
 pub use batata_ai_prompt as prompt;
 pub use batata_ai_provider as provider;
+pub use batata_ai_rag as rag;
 pub use batata_ai_router as router;
 pub use batata_ai_storage as storage;
 

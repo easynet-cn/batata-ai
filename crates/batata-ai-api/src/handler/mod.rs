@@ -3,4 +3,5 @@ pub mod chat;
 pub mod conversation;
 pub mod health;
 pub mod model;
+pub mod rag;
 pub mod usage;

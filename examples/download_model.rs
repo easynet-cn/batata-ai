@@ -1,6 +1,6 @@
-use std::path::PathBuf;
-
-use batata_ai::local::models::{download_model_to, ModelDescriptor};
+use batata_ai::local::models::{
+    default_models_dir, download_model_to, ModelDescriptor,
+};
 
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
@@ -22,23 +22,28 @@ fn main() -> anyhow::Result<()> {
         }
         println!();
         println!("Examples:");
-        println!("  download_model phi3                    # download to ./models/");
-        println!("  download_model qwen2 /opt/models       # download to /opt/models/");
-        println!("  download_model llama3 ./my-models       # download to ./my-models/");
+        println!("  download_model phi3                    # download to $BATATA_AI_MODELS_DIR or ~/work/models/<model>/");
+        println!("  download_model qwen2 /opt/models       # download to /opt/models/<model>/");
+        println!("  download_model llama3 ./my-models      # download to ./my-models/<model>/");
+        println!();
+        println!("Override base directory with BATATA_AI_MODELS_DIR env var.");
         return Ok(());
     }
 
     let model_name = &args[1];
-    let target_dir = if args.len() >= 3 {
-        PathBuf::from(&args[2])
+    let base_dir = if args.len() >= 3 {
+        std::path::PathBuf::from(&args[2])
     } else {
-        PathBuf::from("./models")
+        default_models_dir()
     };
 
-    println!("Downloading '{model_name}' to {}", target_dir.display());
+    println!(
+        "Downloading '{model_name}' to {}/{model_name}/",
+        base_dir.display()
+    );
     println!();
 
-    let (model_path, tokenizer_path) = download_model_to(model_name, &target_dir)?;
+    let (model_path, tokenizer_path) = download_model_to(model_name, &base_dir, true)?;
 
     println!();
     println!("Done! Files:");
