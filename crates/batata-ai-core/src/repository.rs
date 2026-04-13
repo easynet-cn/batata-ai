@@ -3,10 +3,11 @@ use async_trait::async_trait;
 use chrono::NaiveDateTime;
 
 use crate::domain::{
-    ApiKey, Conversation, ConversationMessage, ModelCost, ModelDefinition, ModelProvider,
-    ModelType, ObjectStoreBucket, ObjectStoreConfig, PromptDefinition, PromptVersion,
-    ProviderDefinition, RequestLog, RoutingPolicyDefinition, SkillDefinition, SkillVersion,
-    StoredObject, Tenant, TenantUsage, User,
+    ApiKey, Conversation, ConversationMessage, DeploymentStatus, ModelBenchmark, ModelCost,
+    ModelDefinition, ModelDeployment, ModelProvider, ModelType, ObjectStoreBucket,
+    ObjectStoreConfig, PromptDefinition, PromptVersion, ProviderDefinition, RequestLog,
+    RoutingPolicyDefinition, SkillDefinition, SkillVersion, StoredObject, Tenant, TenantUsage,
+    User,
 };
 use crate::error::Result;
 
@@ -77,6 +78,49 @@ pub trait ModelRepository: Repository<ModelDefinition> {
     async fn find_providers(&self, model_id: &str) -> Result<Vec<ProviderDefinition>>;
     async fn add_provider(&self, rel: &ModelProvider) -> Result<()>;
     async fn remove_provider(&self, model_id: &str, provider_id: &str) -> Result<()>;
+}
+
+// ---------------------------------------------------------------------------
+// Model Deployment (lifecycle / A-B testing)
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+pub trait ModelDeploymentRepository: Send + Sync {
+    async fn create(&self, deployment: &ModelDeployment) -> Result<ModelDeployment>;
+    async fn find_by_id(&self, id: &str) -> Result<Option<ModelDeployment>>;
+    async fn update(&self, deployment: &ModelDeployment) -> Result<ModelDeployment>;
+    async fn delete(&self, id: &str) -> Result<bool>;
+    /// Find all deployments for a model.
+    async fn find_by_model(&self, model_id: &str) -> Result<Vec<ModelDeployment>>;
+    /// Find active/canary deployments for a model (for routing decisions).
+    async fn find_active_by_model(&self, model_id: &str) -> Result<Vec<ModelDeployment>>;
+    /// Find deployments by status.
+    async fn find_by_status(&self, status: &DeploymentStatus) -> Result<Vec<ModelDeployment>>;
+    /// Update traffic weight for a deployment.
+    async fn set_traffic_weight(&self, id: &str, weight: i32) -> Result<()>;
+    /// Promote a staged/canary deployment to active (sets weight=100, retires previous active).
+    async fn promote(&self, id: &str) -> Result<ModelDeployment>;
+}
+
+// ---------------------------------------------------------------------------
+// Model Benchmark (performance tracking)
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+pub trait ModelBenchmarkRepository: Send + Sync {
+    async fn create(&self, benchmark: &ModelBenchmark) -> Result<ModelBenchmark>;
+    async fn find_by_deployment(
+        &self,
+        deployment_id: &str,
+        limit: u64,
+    ) -> Result<Vec<ModelBenchmark>>;
+    /// Compare two deployments side by side for the same period range.
+    async fn compare_deployments(
+        &self,
+        deployment_a: &str,
+        deployment_b: &str,
+        limit: u64,
+    ) -> Result<(Vec<ModelBenchmark>, Vec<ModelBenchmark>)>;
 }
 
 // ---------------------------------------------------------------------------

@@ -118,3 +118,109 @@ impl Default for GuardrailPipeline {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A mock guardrail that always passes.
+    struct PassGuardrail;
+
+    #[async_trait]
+    impl Guardrail for PassGuardrail {
+        fn name(&self) -> &str {
+            "pass"
+        }
+        async fn check_input(&self, _content: &str) -> crate::error::Result<GuardrailResult> {
+            Ok(GuardrailResult::pass())
+        }
+        async fn check_output(&self, _content: &str) -> crate::error::Result<GuardrailResult> {
+            Ok(GuardrailResult::pass())
+        }
+    }
+
+    /// A mock guardrail that returns a non-critical violation.
+    struct WarnGuardrail;
+
+    #[async_trait]
+    impl Guardrail for WarnGuardrail {
+        fn name(&self) -> &str {
+            "warn"
+        }
+        async fn check_input(&self, _content: &str) -> crate::error::Result<GuardrailResult> {
+            Ok(GuardrailResult::fail(vec![Violation {
+                rule: "warn_rule".to_string(),
+                message: "warning".to_string(),
+                severity: Severity::Medium,
+            }]))
+        }
+        async fn check_output(&self, _content: &str) -> crate::error::Result<GuardrailResult> {
+            Ok(GuardrailResult::fail(vec![Violation {
+                rule: "warn_rule".to_string(),
+                message: "warning".to_string(),
+                severity: Severity::Medium,
+            }]))
+        }
+    }
+
+    /// A mock guardrail that returns a critical violation.
+    struct CriticalGuardrail;
+
+    #[async_trait]
+    impl Guardrail for CriticalGuardrail {
+        fn name(&self) -> &str {
+            "critical"
+        }
+        async fn check_input(&self, _content: &str) -> crate::error::Result<GuardrailResult> {
+            Ok(GuardrailResult::fail(vec![Violation {
+                rule: "critical_rule".to_string(),
+                message: "critical".to_string(),
+                severity: Severity::Critical,
+            }]))
+        }
+        async fn check_output(&self, _content: &str) -> crate::error::Result<GuardrailResult> {
+            Ok(GuardrailResult::fail(vec![Violation {
+                rule: "critical_rule".to_string(),
+                message: "critical".to_string(),
+                severity: Severity::Critical,
+            }]))
+        }
+    }
+
+    #[tokio::test]
+    async fn empty_pipeline_passes() {
+        let pipeline = GuardrailPipeline::new();
+        let result = pipeline.check_input("anything").await.unwrap();
+        assert!(result.passed);
+        assert!(result.violations.is_empty());
+    }
+
+    #[tokio::test]
+    async fn pipeline_with_passing_guardrail_passes() {
+        let pipeline = GuardrailPipeline::new().add(Box::new(PassGuardrail));
+        let result = pipeline.check_input("anything").await.unwrap();
+        assert!(result.passed);
+        assert!(result.violations.is_empty());
+    }
+
+    #[tokio::test]
+    async fn non_critical_violation_collects_violations() {
+        let pipeline = GuardrailPipeline::new().add(Box::new(WarnGuardrail));
+        let result = pipeline.check_input("anything").await.unwrap();
+        assert!(!result.passed);
+        assert_eq!(result.violations.len(), 1);
+        assert_eq!(result.violations[0].severity, Severity::Medium);
+    }
+
+    #[tokio::test]
+    async fn critical_violation_returns_immediately() {
+        // Add a pass guardrail after critical to ensure pipeline stops early
+        let pipeline = GuardrailPipeline::new()
+            .add(Box::new(CriticalGuardrail))
+            .add(Box::new(WarnGuardrail));
+        let result = pipeline.check_input("anything").await.unwrap();
+        assert!(!result.passed);
+        assert_eq!(result.violations.len(), 1);
+        assert_eq!(result.violations[0].severity, Severity::Critical);
+    }
+}

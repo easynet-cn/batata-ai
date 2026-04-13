@@ -94,6 +94,12 @@ pub async fn start(state: AppState, bind: &str) -> std::io::Result<()> {
             .service(handler::admin::model::list_models_admin)
             .service(handler::admin::model::update_model)
             .service(handler::admin::model::delete_model)
+            // Vision
+            .service(handler::vision::recognize_product)
+            .service(handler::vision::caption_image)
+            .service(handler::vision::add_product)
+            .service(handler::vision::list_products)
+            .service(handler::vision::batch_add_products)
     })
     .bind(bind)?
     .run()

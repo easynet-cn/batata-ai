@@ -1,13 +1,17 @@
 pub mod cache;
 pub mod guardrails;
 pub mod policy;
+#[cfg(feature = "redis")]
+pub mod redis_cache;
 pub mod router;
 pub mod service;
 pub mod status;
 pub mod webhook;
 
 pub use cache::InMemoryCache;
-pub use guardrails::{KeywordFilter, LengthLimit};
+#[cfg(feature = "redis")]
+pub use redis_cache::RedisCache;
+pub use guardrails::{KeywordFilter, LengthLimit, PiiFilter, PromptInjectionFilter};
 pub use policy::{
     ChainPolicy, CostPolicy, FallbackPolicy, LatencyPolicy, PriorityPolicy, WeightedPolicy,
 };

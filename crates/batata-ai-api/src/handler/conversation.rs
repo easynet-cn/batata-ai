@@ -4,6 +4,8 @@ use std::sync::Arc;
 use batata_ai_core::domain::Conversation;
 use batata_ai_core::repository::{ConversationMessageRepository, ConversationRepository};
 
+use crate::middleware::auth::AuthContext;
+
 #[derive(serde::Deserialize)]
 pub struct CreateConversationRequest {
     pub title: Option<String>,
@@ -21,12 +23,16 @@ pub struct PaginationParams {
 pub async fn create_conversation(
     conv_repo: web::Data<Arc<dyn ConversationRepository>>,
     body: web::Json<CreateConversationRequest>,
-    // TODO: extract tenant_id from AuthContext
+    auth: Option<web::ReqData<AuthContext>>,
 ) -> actix_web::Result<HttpResponse> {
+    let tenant_id = auth
+        .as_ref()
+        .map(|a| a.tenant_id.clone())
+        .unwrap_or_default();
     let now = chrono::Utc::now().naive_utc();
     let conversation = Conversation {
         id: uuid::Uuid::new_v4().to_string(),
-        tenant_id: String::new(), // TODO: from auth context
+        tenant_id,
         title: body.title.clone(),
         model: body.model.clone(),
         system_prompt: body.system_prompt.clone(),
@@ -48,12 +54,15 @@ pub async fn create_conversation(
 pub async fn list_conversations(
     conv_repo: web::Data<Arc<dyn ConversationRepository>>,
     query: web::Query<PaginationParams>,
+    auth: Option<web::ReqData<AuthContext>>,
 ) -> actix_web::Result<HttpResponse> {
     let page = query.page.unwrap_or(0);
     let page_size = query.page_size.unwrap_or(20);
 
-    // TODO: get tenant_id from auth context
-    let tenant_id = "";
+    let tenant_id = auth
+        .as_ref()
+        .map(|a| a.tenant_id.as_str())
+        .unwrap_or("");
 
     let conversations = conv_repo
         .find_by_tenant(tenant_id, page, page_size)

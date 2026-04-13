@@ -61,3 +61,37 @@ impl Guardrail for LengthLimit {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn content_within_limits_passes() {
+        let limit = LengthLimit::new(100, 200);
+        let result = limit.check_input("short input").await.unwrap();
+        assert!(result.passed);
+        let result = limit.check_output("short output").await.unwrap();
+        assert!(result.passed);
+    }
+
+    #[tokio::test]
+    async fn input_over_limit_fails() {
+        let limit = LengthLimit::new(5, 200);
+        let result = limit.check_input("this is too long").await.unwrap();
+        assert!(!result.passed);
+        assert_eq!(result.violations.len(), 1);
+        assert_eq!(result.violations[0].rule, "length_limit_input");
+        assert_eq!(result.violations[0].severity, Severity::High);
+    }
+
+    #[tokio::test]
+    async fn output_over_limit_fails() {
+        let limit = LengthLimit::new(200, 5);
+        let result = limit.check_output("this is too long").await.unwrap();
+        assert!(!result.passed);
+        assert_eq!(result.violations.len(), 1);
+        assert_eq!(result.violations[0].rule, "length_limit_output");
+        assert_eq!(result.violations[0].severity, Severity::High);
+    }
+}

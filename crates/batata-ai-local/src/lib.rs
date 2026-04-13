@@ -8,6 +8,8 @@ pub mod model;
 pub mod model_pool;
 pub mod models;
 pub mod phi3;
+pub mod product_classifier;
 pub mod provider;
 pub mod stable_diffusion;
 pub mod whisper;
+pub mod yolo;

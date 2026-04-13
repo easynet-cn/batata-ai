@@ -60,3 +60,41 @@ impl Guardrail for KeywordFilter {
         Ok(self.check_content(content))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn blocked_keyword_detected() {
+        let filter = KeywordFilter::new(vec!["badword".to_string()]);
+        let result = filter.check_input("this contains badword here").await.unwrap();
+        assert!(!result.passed);
+        assert_eq!(result.violations.len(), 1);
+        assert_eq!(result.violations[0].severity, Severity::Critical);
+    }
+
+    #[tokio::test]
+    async fn case_insensitive_matching() {
+        let filter = KeywordFilter::new(vec!["BadWord".to_string()]);
+        let result = filter.check_input("BADWORD is here").await.unwrap();
+        assert!(!result.passed);
+        assert_eq!(result.violations.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn clean_content_passes() {
+        let filter = KeywordFilter::new(vec!["badword".to_string()]);
+        let result = filter.check_input("this is perfectly fine").await.unwrap();
+        assert!(result.passed);
+        assert!(result.violations.is_empty());
+    }
+
+    #[tokio::test]
+    async fn multiple_violations_collected() {
+        let filter = KeywordFilter::new(vec!["bad".to_string(), "evil".to_string()]);
+        let result = filter.check_input("bad and evil content").await.unwrap();
+        assert!(!result.passed);
+        assert_eq!(result.violations.len(), 2);
+    }
+}

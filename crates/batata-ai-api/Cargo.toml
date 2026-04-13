@@ -33,14 +33,22 @@ serde_json.workspace = true
 sha2 = "0.10"
 hex = "0.4"
 argon2 = { workspace = true }
+jsonwebtoken = { workspace = true }
 casbin = { workspace = true }
 sea-orm-adapter = { workspace = true, features = ["sqlite", "runtime-tokio-rustls"] }
+
+# Image processing
+image.workspace = true
 
 # Utils
 chrono.workspace = true
 uuid.workspace = true
 tracing.workspace = true
 futures.workspace = true
+
+# Metrics
+actix-web-prom = "0.10"
+prometheus = "0.14"
 
 # Database
 sea-orm = { version = "1", features = ["runtime-tokio-rustls"] }

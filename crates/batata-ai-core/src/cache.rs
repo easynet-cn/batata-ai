@@ -71,3 +71,55 @@ pub struct CacheStats {
     pub total_misses: u64,
     pub hit_rate: f64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::message::{ChatRequest, Message};
+
+    fn make_request(model: Option<&str>, messages: Vec<Message>, temperature: Option<f32>) -> ChatRequest {
+        ChatRequest {
+            model: model.map(|s| s.to_string()),
+            messages,
+            temperature,
+            max_tokens: None,
+        }
+    }
+
+    #[test]
+    fn same_request_produces_same_key() {
+        let strategy = DefaultCacheKeyStrategy;
+        let req = make_request(
+            Some("gpt-4"),
+            vec![Message::user("hello")],
+            Some(0.7),
+        );
+        let key1 = strategy.generate_key(&req);
+        let key2 = strategy.generate_key(&req);
+        assert_eq!(key1, key2);
+    }
+
+    #[test]
+    fn different_models_produce_different_keys() {
+        let strategy = DefaultCacheKeyStrategy;
+        let req1 = make_request(Some("gpt-4"), vec![Message::user("hello")], None);
+        let req2 = make_request(Some("gpt-3.5"), vec![Message::user("hello")], None);
+        assert_ne!(strategy.generate_key(&req1), strategy.generate_key(&req2));
+    }
+
+    #[test]
+    fn different_messages_produce_different_keys() {
+        let strategy = DefaultCacheKeyStrategy;
+        let req1 = make_request(Some("gpt-4"), vec![Message::user("hello")], None);
+        let req2 = make_request(Some("gpt-4"), vec![Message::user("world")], None);
+        assert_ne!(strategy.generate_key(&req1), strategy.generate_key(&req2));
+    }
+
+    #[test]
+    fn different_temperatures_produce_different_keys() {
+        let strategy = DefaultCacheKeyStrategy;
+        let req1 = make_request(Some("gpt-4"), vec![Message::user("hello")], Some(0.5));
+        let req2 = make_request(Some("gpt-4"), vec![Message::user("hello")], Some(0.9));
+        assert_ne!(strategy.generate_key(&req1), strategy.generate_key(&req2));
+    }
+}

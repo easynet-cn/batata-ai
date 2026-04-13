@@ -12,6 +12,8 @@ use sha2::{Digest, Sha256};
 use batata_ai_core::domain::ApiKey;
 use batata_ai_core::repository::ApiKeyRepository;
 
+use super::jwt::JwtConfig;
+
 /// Authenticated context, injected into request extensions.
 #[derive(Debug, Clone)]
 pub struct AuthContext {
@@ -101,14 +103,30 @@ where
             let repo = api_key_repo
                 .ok_or_else(|| ErrorUnauthorized("internal: api key repo not configured"))?;
 
-            let api_key: ApiKey = match (bearer_token, x_app_key, x_app_secret) {
-                // Mode 1: Bearer token auth
+            // Try JWT first if a JwtConfig is registered and we have a Bearer token
+            let jwt_config = req.app_data::<web::Data<JwtConfig>>().cloned();
+
+            let auth_ctx: AuthContext = match (bearer_token, x_app_key, x_app_secret) {
+                // Mode 1: Bearer token — try JWT decode first, then API key hash
                 (Some(token), _, _) => {
-                    let key_hash = hash_api_key(&token);
-                    repo.find_by_key_hash(&key_hash)
-                        .await
-                        .map_err(|_| ErrorUnauthorized("internal error"))?
-                        .ok_or_else(|| ErrorUnauthorized("invalid API key"))?
+                    if let Some(jwt_cfg) = &jwt_config {
+                        if let Ok(token_data) = jwt_cfg.validate_token(&token) {
+                            let claims = token_data.claims;
+                            AuthContext {
+                                tenant_id: claims.tenant_id,
+                                user_id: Some(claims.sub),
+                                api_key_id: String::new(),
+                                scopes: claims.scopes,
+                                rate_limit: 0,
+                            }
+                        } else {
+                            // JWT decode failed — fall back to API key
+                            resolve_api_key(&repo, &token).await?
+                        }
+                    } else {
+                        // No JWT configured — API key only
+                        resolve_api_key(&repo, &token).await?
+                    }
                 }
                 // Mode 2: app_key + app_secret dual-key auth
                 (None, Some(app_key), Some(app_secret)) => {
@@ -118,7 +136,6 @@ where
                         .map_err(|_| ErrorUnauthorized("internal error"))?
                         .ok_or_else(|| ErrorUnauthorized("invalid app key"))?;
 
-                    // Verify app_secret against stored hash
                     let secret_hash = hash_api_key(&app_secret);
                     let stored_hash = found
                         .app_secret_hash
@@ -127,7 +144,17 @@ where
                     if secret_hash != stored_hash {
                         return Err(ErrorUnauthorized("invalid app secret"));
                     }
-                    found
+
+                    validate_api_key(&found)?;
+                    let _ = repo.touch_last_used(&found.id).await;
+
+                    AuthContext {
+                        tenant_id: found.tenant_id,
+                        user_id: None,
+                        api_key_id: found.id,
+                        scopes: found.scopes,
+                        rate_limit: found.rate_limit.unwrap_or(0),
+                    }
                 }
                 // Missing app_secret
                 (None, Some(_), None) => {
@@ -136,40 +163,52 @@ where
                 // No credentials at all
                 _ => {
                     return Err(ErrorUnauthorized(
-                        "missing credentials: use Authorization Bearer or X-App-Key + X-App-Secret",
+                        "missing credentials: use Authorization Bearer, JWT, or X-App-Key + X-App-Secret",
                     ));
                 }
             };
 
-            // Check if key is enabled
-            if !api_key.enabled {
-                return Err(ErrorUnauthorized("API key is disabled"));
-            }
-
-            // Check expiration
-            if let Some(expires_at) = api_key.expires_at {
-                if chrono::Utc::now().naive_utc() > expires_at {
-                    return Err(ErrorUnauthorized("API key has expired"));
-                }
-            }
-
-            // Update last_used_at (fire-and-forget)
-            let _ = repo.touch_last_used(&api_key.id).await;
-
-            // Insert AuthContext into request extensions so downstream
-            // middleware (CasbinAuthz, RateLimit) and handlers can access it.
-            let auth_ctx = AuthContext {
-                tenant_id: api_key.tenant_id,
-                user_id: None,
-                api_key_id: api_key.id,
-                scopes: api_key.scopes,
-                rate_limit: api_key.rate_limit.unwrap_or(0),
-            };
             req.extensions_mut().insert(auth_ctx);
-
             svc.borrow_mut().call(req).await
         })
     }
+}
+
+/// Validate API key is enabled and not expired.
+fn validate_api_key(api_key: &ApiKey) -> Result<(), Error> {
+    if !api_key.enabled {
+        return Err(ErrorUnauthorized("API key is disabled"));
+    }
+    if let Some(expires_at) = api_key.expires_at {
+        if chrono::Utc::now().naive_utc() > expires_at {
+            return Err(ErrorUnauthorized("API key has expired"));
+        }
+    }
+    Ok(())
+}
+
+/// Resolve a Bearer token as an API key hash and return AuthContext.
+async fn resolve_api_key(
+    repo: &web::Data<Arc<dyn ApiKeyRepository>>,
+    token: &str,
+) -> Result<AuthContext, Error> {
+    let key_hash = hash_api_key(token);
+    let api_key = repo
+        .find_by_key_hash(&key_hash)
+        .await
+        .map_err(|_| ErrorUnauthorized("internal error"))?
+        .ok_or_else(|| ErrorUnauthorized("invalid API key or JWT"))?;
+
+    validate_api_key(&api_key)?;
+    let _ = repo.touch_last_used(&api_key.id).await;
+
+    Ok(AuthContext {
+        tenant_id: api_key.tenant_id,
+        user_id: None,
+        api_key_id: api_key.id,
+        scopes: api_key.scopes,
+        rate_limit: api_key.rate_limit.unwrap_or(0),
+    })
 }
 
 /// Hash an API key using SHA-256.
